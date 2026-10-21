@@ -3,11 +3,13 @@ import { isHex, inkText, paintCss } from './inks.js'
 import { DEFAULT_MASK, SHAPES, markupCache, maskOf } from './characters.js'
 import { createSource, EMPTY_ROSTER, indexRoster, isAgentSession } from './sources.js'
 import { teamActions } from './team-actions.js'
-import { themeCss, shellTokens, registry, registerShape, registerTheme, allThemes } from './themes.js'
+import { themeCss, registry, registerShape, registerTheme, allThemes } from './themes.js'
 import { MENTION_ORIGIN, currentPart } from './text.js'
-import { SHELL_CSS, CONVERSATION_CSS, installStyles, installCompiledStyles } from './styles.js'
+import { COMPONENT_CSS, CONVERSATION_CSS, installStyles, installCompiledStyles } from './styles.js'
 import { lookOf } from './mark.js'
-import { TeamSidebar, ConnectPlugins, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SIDEBAR_CSS, RETURN_CSS, holdShellShortcuts, openHarnessOnboarding, openHarnessSettings } from './sidebar.js'
+import { openHarnessOnboarding, openHarnessSettings } from './sidebar.js'
+import { COMPANION_PANEL, COMPANION_NAME, COMPANION_ENTRY_CSS, COMPANION_TEAM_CSS, CompanionIcon, CompanionLanding } from './companion.js'
+import { companionGroups, nextCompanionPart } from './companion-navigation.js'
 import { HeaderPill } from './header.js'
 import { ComposerPlus, ComposerVoice, menuIcons } from './composer.js'
 import { CHATS_SOURCE, atSources } from './at-menu.js'
@@ -29,7 +31,7 @@ import { USAGE_CSS } from './usage-page.js'
 import { SCHEDULE_CSS } from './schedules.js'
 import { STORAGE, migrateStorage } from './storage.js'
 import { noteLeft, setUnread, sharedMap, toggleReaction } from './shared-map.js'
-import { freePriority, groupsFor, readMode, surfaceGroups, writeMode } from './surface.js'
+import { freePriority, surfaceGroups } from './surface.js'
 import { installLocale, language, t } from './i18n.js'
 import { noteClientError, quietly } from './diagnostics.js'
 import { ErrorToast, FEEDBACK_CSS } from './feedback.js'
@@ -53,10 +55,7 @@ export function apply(ctx) {
   // `details` is the panel's subject (a Session id); `view` picks details or the
   // subject Bot's browser inside it.
   const ui = createSource({ details: null, view: 'details', renaming: false, tab: null, newChat: null, exchange: null, menu: null, voice: null, palette: null, quote: null, settings: null, memory: null, toast: null, signIn: null, renameAgent: null, unread: unreadStore.read(), reactions: reactionStore.read(), visits: {} })
-  // Bot mode paints the whole team surface; Agent mode withdraws every slot and
-  // style so the shell's own interface returns. `plain` stays false until a Bot-mode
-  // view hosts a plain session, which drops only the conversation replacements.
-  const surface = createSource({ mode: readMode(), plain: false })
+  const surface = createSource({ shell: false, conversation: false })
   // DSH Agent Session ids from the last pull, so a reload already knows the main
   // view is a plain Session before the team answers.
   let agentSessionCache = new Set()
@@ -64,16 +63,12 @@ export function apply(ctx) {
   // Sessions adopted on this window (workspace pick, fork) but not yet in the roster.
   const pendingAdopt = new Map()
   const isAgentSessionId = id => isAgentSession(roster.getSnapshot(), agentSessionCache, id) || pendingAdopt.has(id)
-  const agentOfSession = id => roster.getSnapshot().agentOf[id] ?? pendingAdopt.get(id)
   // The workspace a Session lives in, for follow-up creates and switch detection.
   const workspaces = ctx.get('workspaces')
   const workspaceOf = (sessionId) => {
     const items = workspaces?.list?.getSnapshot()?.items ?? []
     return items.find(item => item.sessionIds?.includes(sessionId))?.workspaceId
   }
-  // A navigation this plugin started: the surface effect trusts the id it lands on.
-  let expected = null
-  const setPlain = (plain) => surface.set(state => (state.plain === plain ? state : { ...state, plain }))
   // A DSH Agent Session shows the plain conversation: the Bot details and browser
   // panels would follow it and report it is not on the team, so they close.
   const dropPanels = () => ui.set(state => (state.details || state.renaming ? { ...state, details: null, view: 'details', renaming: false, tab: null } : state))
@@ -285,7 +280,6 @@ export function apply(ctx) {
   const installTheme = () => {
     const style = installStyles('', 'theme')
     let key = ''
-    let releaseTokens = null
     const render = () => {
       const snapshot = roster.getSnapshot()
       const prefs = snapshot.ready ? snapshot.prefs ?? {} : savedPrefs
@@ -298,9 +292,6 @@ export function apply(ctx) {
       if (next === key) return
       key = next
       style.textContent = themeCss(themes[id], accent)
-      const release = releaseTokens
-      releaseTokens = ctx.theme.overrideTokens('ds-bot', shellTokens(themes[id]))
-      if (typeof release === 'function') release()
       if (snapshot.ready) {
         try { localStorage.setItem(PREFS_KEY, JSON.stringify({ theme: prefs.theme, accent: prefs.accent, motion: prefs.motion })) } catch { /* storage unavailable */ }
       }
@@ -311,12 +302,8 @@ export function apply(ctx) {
     return () => {
       offRoster()
       offRegistry()
-      try {
-        if (typeof releaseTokens === 'function') releaseTokens()
-      } finally {
-        delete document.body.dataset.btMotion
-        style.remove()
-      }
+      delete document.body.dataset.btMotion
+      style.remove()
     }
   }
 
@@ -332,8 +319,6 @@ export function apply(ctx) {
     }
   }, 'ds-bot: registry')
 
-  ctx.inject(['shortcuts'], scope => { scope.effect(() => holdShellShortcuts(scope.shortcuts), 'ds-bot: settings shortcut') })
-
   const after = promise => promise.then(async (value) => { await pull().catch(() => {}); return value })
   // A Bot id, or any part of its chat, opens the Bot's current part.
   const partFor = (id) => {
@@ -347,7 +332,7 @@ export function apply(ctx) {
     return ids
   }
   const mainView = () => Object.values(ctx.sessions.list.getSnapshot().byId ?? {}).find(session => (session?.retainedBy?.mainView ?? 0) > 0)?.id
-  const show = listedOpener({ list: ctx.sessions.list, refresh: () => Promise.resolve(ctx.sessions.refresh?.()).catch(quietly('refresh sessions')), open: (target) => { expected = target; ctx.uiWorkspace.openSession(target) }, current: mainView })
+  const show = listedOpener({ list: ctx.sessions.list, refresh: () => Promise.resolve(ctx.sessions.refresh?.()).catch(quietly('refresh sessions')), open: target => ctx.uiWorkspace.openSession(target), current: () => `${mainView() ?? ''}:${ctx.layout.panelInfo.getSnapshot().activePanelId ?? ''}` })
   const actions = {
     ...teamActions({ call, after, partFor, roster, ui, live, cards, heldCards, turnClock }),
     // The full-pane overlays sit above the conversation, so opening one must dismiss them
@@ -357,7 +342,6 @@ export function apply(ctx) {
       // A DSH Agent Session id lands on the plain surface, not the Bot skin.
       if (isAgentSessionId(id)) return actions.openAgentSession(id)
       ui.set(state => (state.newChat || state.exchange || state.menu || state.palette ? { ...state, newChat: null, exchange: null, menu: null, palette: null } : state))
-      setPlain(false)
       const target = partFor(id)
       show(target)
     },
@@ -365,7 +349,6 @@ export function apply(ctx) {
     // before the navigation so the Bot skin never flashes.
     openAgentSession: (sessionId) => {
       ui.set(state => ({ ...state, newChat: null, exchange: null, menu: null, palette: null, details: null, view: 'details', renaming: false, tab: null }))
-      setPlain(true)
       show(sessionId)
     },
     addAgent: async () => {
@@ -422,42 +405,14 @@ export function apply(ctx) {
     landOn: async (id, last) => {
       if (last) await pull().catch(() => {})
       const bot = last ? roster.getSnapshot().byId[last.botId] : undefined
-      setPlain(false)
       const target = bot && currentPart(bot) !== last.sessionId ? currentPart(bot) : partFor(id)
       show(target)
     },
     selectPanel: (id) => { ctx.layout.selectPanel(id) },
     toggleSidebar: () => { ctx.layout.toggleSidebar() },
-    // Agent mode hands the surface back to the shell; everything open on the Bot
-    // surface closes first so nothing stale reopens on the way back.
-    setSurface: (mode) => {
-      if (mode !== 'bot' && mode !== 'agent') return
-      if (surface.getSnapshot().mode === mode) return
-      if (mode === 'agent') {
-        ui.set(state => ({ ...state, details: null, view: 'details', settings: null, palette: null, newChat: null, menu: null, voice: null, exchange: null, memory: null, toast: null }))
-      }
-      writeMode(mode)
-      surface.set(state => ({ ...state, mode }))
-      if (mode !== 'bot') return
-      // Back in Bot mode the view must hold a team conversation; an outside
-      // Session left over from Agent mode would wear the Bot skin without one.
-      const home = () => {
-        const snapshot = roster.getSnapshot()
-        if (!snapshot.ready || !snapshot.mainBotId) return
-        const list = ctx.sessions.list.getSnapshot()
-        const main = Object.values(list.byId ?? {}).find(session => (session?.retainedBy?.mainView ?? 0) > 0)?.id
-        if (main !== undefined && snapshot.byId[main] === undefined && snapshot.roomsById[main] === undefined) {
-          actions.openSession(snapshot.mainBotId)
-        }
-      }
-      if (roster.getSnapshot().ready) home()
-      else {
-        const off = roster.subscribe(() => {
-          if (!roster.getSnapshot().ready) return
-          off()
-          home()
-        })
-      }
+    openCompanion: (id) => {
+      actions.openSession(id)
+      actions.showDetails(partFor(id))
     },
     markUnread: id => writeUnread(id, true),
     beginVisit: (id) => {
@@ -631,12 +586,10 @@ export function apply(ctx) {
     controller.toggleSource(CHATS_SOURCE, { trigger: '@', query: '', quoted: false, position: 'inline', span })
   }
 
-  // The shell group paints the team surface around the session; the conversation
-  // group re-skins the session itself. Each step returns a disposer from slots.inject,
-  // so a surface change withdraws the whole group and the outlets re-render.
+  // Bot components and dialogs mount within the companion. DSH owns navigation,
+  // branding, global settings and theme tokens.
   const installShell = () => [
-    () => installCompiledStyles(SHELL_CSS, 'shell'),
-    () => installCompiledStyles(SIDEBAR_CSS, 'sidebar'),
+    () => installCompiledStyles(COMPONENT_CSS + COMPANION_TEAM_CSS, 'companion'),
     () => installCompiledStyles(SECRET_CSS, 'secrets'),
     () => installCompiledStyles(MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + GROUP_SETTINGS_CSS, 'models'),
     () => installCompiledStyles(USAGE_CSS, 'usage'),
@@ -646,17 +599,8 @@ export function apply(ctx) {
     () => installCompiledStyles(MEMBER_CSS, 'members'),
     () => installCompiledStyles(USER_MESSAGE_CSS, 'user-messages'),
     () => installCompiledStyles(WIDGET_CSS, 'widgets'),
-    browsers ? () => installCompiledStyles(BROWSER_CSS, 'browser') : null,
+    () => installCompiledStyles(BROWSER_CSS, 'browser'),
     () => installTheme(),
-    () => shadow('sidebar.workspaces', { priority: BOT_PRIORITY, inject: face }, TeamSidebar),
-    () => shadow('sidebar.brand.mark', { priority: BOT_PRIORITY }, BrandMark),
-    () => shadow('sidebar.brand.name', { priority: BOT_PRIORITY }, BrandName),
-    () => shadow('sidebar.footer.action', { id: 'bot-account', order: -200, inject: face }, FooterAccount),
-    () => shadow('sidebar.footer.action', { id: 'bot-connect', order: -100, inject: face }, ConnectPlugins),
-    () => shadow('settings.trigger', { priority: BOT_PRIORITY }, YouAvatar),
-    // The whale wins the seat over a shell account plugin's own launcher (the
-    // Desktop's "··· More"), which comes back in Agent mode.
-    () => shadow('settings.launcher', { priority: BOT_PRIORITY, inject: face }, AccountLauncher),
     () => shadow('shell.overlay', { id: 'bot', order: 50, inject: face }, Overlays),
     () => shadow('shell.overlay', { id: 'bot-signin', order: 55, inject: face }, DeepSeekSignIn),
     () => shadow('shell.overlay', { id: 'bot-toast', order: 60, inject: face }, ErrorToast),
@@ -697,72 +641,42 @@ export function apply(ctx) {
     () => shadow('conversation.input.dock', { id: 'bot-view', order: -95, inject: face }, WidgetDock),
     () => shadow('conversation.input.dock', { id: 'bot-secret', order: -90, inject: face }, SecretDock),
   ]
-  // The return button belongs to neither group: it renders only in Agent mode.
-  ctx.effect(() => installCompiledStyles(RETURN_CSS, 'return'), 'ds-bot: return styles')
-  shadow('sidebar.footer.action', { id: 'bot-return', order: -300, inject: face }, BotReturn)
+  ctx.effect(() => installCompiledStyles(COMPANION_ENTRY_CSS, 'companion-entry'), 'ds-bot: companion entry styles')
+  shadow('main', { key: COMPANION_PANEL, inject: face }, CompanionLanding)
+  shadow('sidebar.panellist', { id: COMPANION_PANEL, order: -100, label: COMPANION_NAME }, CompanionIcon)
 
-  // The main view decides `plain`: a DSH Agent Session keeps the Bot shell but
-  // withdraws the conversation replacements, so the native dsh page shows. A jump
-  // this plugin did not start — the hero's workspace picker or a fork — opens an
-  // unowned Session; coming from a DSH Agent Session it is adopted into that Agent.
+  // A retained Bot session may sit behind another panel. Ordinary navigation never
+  // adopts a session, and only an owned chat follows its own context rollover.
   ctx.effect(() => {
-    let previous
+    let previousBot
     const sync = () => {
       const list = ctx.sessions.list.getSnapshot()
       const main = Object.values(list.byId ?? {}).find(session => (session?.retainedBy?.mainView ?? 0) > 0)?.id
-      const plain = isAgentSessionId(main)
-      setPlain(plain)
-      if (plain) dropPanels()
-      if (main === previous) return
-      const before = previous
-      previous = main
-      const ours = expected !== null && main === expected
-      expected = null
-      if (ours || main === undefined) return
-      // Adoption is a Bot-mode affair: in Agent mode the native sidebar owns
-      // navigation, and opening an existing Session there must not pull it in.
-      if (surface.getSnapshot().mode !== 'bot') return
-      const agentId = before !== undefined ? agentOfSession(before) : undefined
-      if (agentId === undefined) return
       const snapshot = roster.getSnapshot()
-      if (snapshot.byId[main] !== undefined || snapshot.roomsById[main] !== undefined || agentOfSession(main) !== undefined) return
-      // Only a Session this jump created joins the Agent: a blank one from the
-      // workspace picker, or a fork of a Session the same Agent owns. An existing
-      // Session the user opened from the sidebar keeps its team tools and stays out.
-      const row = list.byId[main]
-      // The client list maps the fork's parent to `parentId`; the raw field is
-      // the fallback for shapes that skip the mapping.
-      const parent = row?.parentId ?? row?.parentSessionId
-      const forkedFromAgent = parent !== undefined && agentOfSession(parent) === agentId
-      if (row?.blank !== true && !forkedFromAgent) return
-      pendingAdopt.set(main, agentId)
-      setPlain(true)
-      void call('agent-adopt', { agentId, sessionId: main }).then(() => pull()).catch((error) => {
-        pendingAdopt.delete(main)
-        console.warn('[ds-bot] agent-adopt', error)
-        // The Session never joined the Agent: the sync puts the team surface
-        // back (a Map delete fires no subscription), and the user hears why.
-        sync()
-        actions.reportError(error, 'agent-adopt')
-      })
-      // The hero's workspace picker leaves the blank Session it switched away from
-      // behind; in another workspace it stays empty forever, so it is archived.
-      const next = workspaceOf(main)
-      if (list.byId[before]?.blank === true && next !== undefined && workspaceOf(before) !== next) {
-        void call('agent-archive', { agentId, sessionId: before }).then(() => pull()).catch(() => {})
+      const panel = ctx.layout.panelInfo.getSnapshot().activePanelId
+      const wanted = companionGroups(snapshot, main, panel)
+      if (!wanted.conversation && surface.getSnapshot().conversation) {
+        dropPanels()
+        ui.set(state => ({ ...state, settings: null, palette: null, newChat: null, menu: null, voice: null, exchange: null, memory: null, signIn: null }))
       }
+      surface.set(state => state.conversation === wanted.conversation ? state : wanted)
+      if (panel !== null || !snapshot.ready) return
+      const next = nextCompanionPart(snapshot, main ?? previousBot)
+      if (main !== undefined) previousBot = snapshot.byId[main] ? main : undefined
+      if (next) actions.openSession(next)
     }
     const offList = ctx.sessions.list.subscribe(sync)
     const offRoster = roster.subscribe(sync)
+    const offPanel = ctx.layout.panelInfo.subscribe(sync)
     sync()
-    return () => { offList(); offRoster() }
-  }, 'ds-bot: agent surface')
+    return () => { offList(); offRoster(); offPanel() }
+  }, 'ds-bot: companion navigation')
 
   ctx.effect(() => {
     const groups = surfaceGroups({ shell: installShell, conversation: installConversation }, {
       onError: (_group, error) => actions.reportError(new Error(t('Bot mode could not be set up here: {error}', { error: error?.message ?? String(error) })), 'surface'),
     })
-    const reconcile = () => groups.reconcile(groupsFor(surface.getSnapshot()))
+    const reconcile = () => groups.reconcile(surface.getSnapshot())
     reconcile()
     const unsub = surface.subscribe(reconcile)
     return () => {

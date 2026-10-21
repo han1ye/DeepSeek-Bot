@@ -1,5 +1,7 @@
 # ds-bot
 
+> **MyAgent fork, 0.2.0-myagent.1:** this build keeps the original DSH sidebar and global settings. Use **🐳 大肥鱼** to open the companion; use **Manage team** inside its chat for Bot settings and the adjacent selector for Bots and groups. Ordinary chats retain the native DSH interface. Build a local `.tgz` with `npm run build` and `npm pack`; installing `ds-bot` from npm selects upstream instead. The package identity is unchanged, so this build replaces an installed DS Bot. New teams use 大肥鱼; existing names and data are preserved. The feature reference below describes the reused upstream runtime.
+
 The DS Bot plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh). It turns dsh into a team of long-lived Bots that talk to you, to each other and in group chats. See the [project page](../README.md) for an overview, install steps and screenshots.
 
 > Early release (v0.1). Features, tools and the saved data format can still change.
@@ -53,7 +55,7 @@ Run `pnpm install` in the profile folder, then start dsh from the deepseek-harne
 pnpm -s dsh --profile web --no-open
 ```
 
-The first time the team opens, the plugin creates a Main Bot called Chief.
+The first time the team opens, this fork creates a Main Bot called 大肥鱼. Existing teams retain their Main Bot.
 
 **Upgrading from the legacy `dsh-bot` package**: earlier builds used the package name `dsh-bot`. Remove `dsh-bot` from the profile before you add `ds-bot`, because both use the plugin id `bot`. Your team, chats and secrets stay where they are (see [Data and backups](#data-and-backups)); saved browser settings, the theme and Bot colors move over the first time DS Bot opens.
 
@@ -77,7 +79,7 @@ Options go in the profile's `cordis.patch.yml`, under the `bot` entry. All of th
     github: false                   # hide the GitHub connector; default shown in Connectors
 ```
 
-**Updates**: when a window opens, DS Bot asks where it was installed from for a newer release: the npm registry (the one the DSH plugin manager installs from, then its fallbacks), or the latest GitHub release for a `github:…#vX.Y.Z` install. A newer version shows a cloud button at the top right of the sidebar; **Update** reinstalls DS Bot through the DSH plugin manager, and the new version runs from the next DSH start. A linked or local checkout is never offered an update. Settings → About DS Bot shows the same state, with **Check for updates** to ask again at once.
+**Updates**: this fork sets `updateCheck: false` by default. Install a newer fork package through DSH's plugin manager. The upstream update implementation is retained for compatibility; enabling it can offer an upstream package. A linked or local checkout is never offered an update.
 
 The same card can carry DSH itself: a DS Bot release may name the DSH release it was verified against (`dsBot.verifiedDsh` in its `package.json`), and only that version is offered — running something newer is a downgrade offer too. A release that names no version offers no DSH update. A DSH installed from npm is swapped by `npm install -g @deepseek-ai/dsh@<version>`. DSH Desktop installs the newest release its own updater finds, so the card shows DSH there only when that release is the verified one, and **Open updates** opens the app's update panel. A release may raise the floor with `dsBot.minBot`: until the bot itself is that new, the DSH row waits.
 
@@ -114,7 +116,7 @@ A read-only dsh (see [Data and backups](#data-and-backups)) shows memory but can
 
 ## Web search
 
-The package includes a second plugin, `ds-bot/web-search`. It registers the search provider `auto`, and `cordis.patch.yml` makes it the default. Each search goes in this order:
+The package includes a second plugin, `ds-bot/web-search`. It registers the optional search provider `auto`. This fork does not change DSH's global `searchProvider` or `fetchProvider`; select `auto` explicitly in your profile if you want it. When selected, each search goes in this order:
 
 1. If the profile names another `searchProvider`, that one is used.
 2. The current model route's own search, with that route's key and host. The plugin knows the Anthropic Messages, OpenAI Responses and Gemini protocols, and a few search APIs (Ollama, Kimi, Zhipu, MiMo). Add more with `searchApis`.
@@ -123,7 +125,7 @@ The package includes a second plugin, `ds-bot/web-search`. It registers the sear
 
 Each result starts with a `Search backend: …` line that names the path it took.
 
-**Turning `auto` off**: the `web` row still names `auto` when you turn off only the `web-search-auto` row (in the sidebar's Plugins page or with `disabled: true` in a profile patch). Then `web_search` fails in every session, Bot or not, with `WEB_PROVIDER_CONFIGURED_MISSING` (`configured web provider "auto" is not registered`). When you turn that row off, also name another `searchProvider` for the `web` row in the profile's `cordis.patch.yml`. The override replaces the row's whole config, so restate `fetchProvider`:
+**Turning `auto` off after explicitly selecting it**: if your profile's `web` row still names `auto`, disabling only `web-search-auto` makes searches fail with `WEB_PROVIDER_CONFIGURED_MISSING`. Also select another search provider. The override replaces the row's whole config, so restate `fetchProvider`:
 
 ```yaml
 - id: web-search-auto

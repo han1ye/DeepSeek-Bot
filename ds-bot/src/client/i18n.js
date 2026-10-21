@@ -5,6 +5,9 @@
 export const NAMESPACE = 'ds-bot'
 
 const ZH = {
+  'Opening your companion…': '正在打开伙伴对话…',
+  'Bot team': '伙伴团队',
+  'Manage team': '管理团队',
   // Shared
   'Main Bot': '主 Bot',
   Working: '工作中',

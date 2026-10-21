@@ -10,6 +10,8 @@ import { failureLine, install as installTurns, turnFailure } from '../src/host/t
 import { errorCode } from '../src/host/channel.js'
 import { SOURCE_KIND } from '../src/host/constants.js'
 
+const PKG = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+
 test('cleanText hides keys, tokens and the home folder', () => {
   const home = '/home/user'
   const text = 'key sk-abcdef123456 and Bearer abc.def.ghi.jkl at http://h:1/?token=XYZ123&x=1 in /home/user/.dsh/bot, "api_key": "zzzzzzzzz", saved VALUE1234'
@@ -70,7 +72,7 @@ test('warnings are kept, cleaned, written to the log, and read back after a rest
   assert.equal(second.code, 'RATE_LIMIT')
 
   const report = await rt.diagnostics.report({ client: { surface: 'Web', language: 'zh-CN', userAgent: 'Test/1' }, clientErrors: [{ time: 1, text: 'state: HTTP 502' }] })
-  assert.match(report.markdown, /\| DS Bot \| \d+\.\d+\.\d+ \|/)
+  assert.ok(report.markdown.includes(`| DS Bot | ${PKG.version} |`))
   assert.match(report.markdown, /\| Surface \| Web \|/)
   assert.match(report.markdown, /\| Models \| deepseek\/deepseek-chat \|/)
   assert.match(report.markdown, /WARN host \[EACCES\] state write failed/)

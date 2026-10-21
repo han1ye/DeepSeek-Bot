@@ -321,8 +321,10 @@ export function BotPanel({ pane, leaving, roster, actions, useSessions, useSessi
     if (switched) chatRoom.hold(true)
     chatRoom.set(leaving ? null : panelWidth)
     if (switched) chatRoom.hold(false)
+    // Companion navigation can unmount and remount the pane in one commit.
+    // Release its space before the new pane's layout effect claims it.
+    return () => { chatRoom.set(null); chatRoom.hold(false) }
   }, [view, panelWidth, leaving])
-  useEffect(() => () => { chatRoom.set(null); chatRoom.hold(false) }, [])
   useEffect(() => {
     let timer
     const onResize = () => {

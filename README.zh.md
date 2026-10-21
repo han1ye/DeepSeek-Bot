@@ -9,6 +9,16 @@
 
 [English](README.md) | 中文
 
+## MyAgent 伙伴分支
+
+本项目基于 [Fei2411/DeepSeek-Bot](https://github.com/Fei2411/DeepSeek-Bot)，将伙伴入口嵌入原版 DSH。保留 DSH 侧栏、工作区、新会话、插件、账号和全局设置。点击 **🐳 大肥鱼** 进入主 Bot 的持续对话，右侧显示可收起的详情面板；其他 Bot 和群聊通过对话页内的选择器进入，Bot 设置通过 **管理团队** 打开。普通会话使用 DSH 原生聊天界面。
+
+Bot 运行、记忆、上下文管理、委派和群聊复用上游。本次增加伙伴导航及界面作用范围控制，没有另外实现记忆引擎或通信渠道。新团队的主 Bot 默认叫大肥鱼，已有团队保留原名称和数据。默认关闭插件更新检查，安装本分支不会覆盖 DSH 的全局搜索服务设置。
+
+安装本分支：在 `ds-bot/` 中依次运行 `npm ci`、`npm run build`、`npm pack`，然后在 DSH **插件** 页安装生成的 `ds-bot-0.2.0-myagent.1.tgz`，重启 DSH。包名仍为 `ds-bot`，用于替换原插件，不会另建一套团队。下文的 npm 包及上游下载仍然安装上游界面。本分支尚未发布 npm 版本或桌面安装程序。
+
+详见[设计与验证说明](docs/plans/2026-10-22-embedded-companion.md)。下文保留上游功能及发行方式说明，截图展示的是上游界面。
+
 ![版本](https://img.shields.io/badge/版本-v0.2_预览-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.2-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
 
 DeepSeek Bot（简称 DS Bot）是一个基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（简称 dsh）的 bot 插件，插件将 dsh 改造为 bot 形式。你可以与自己创建的 bot 交流、工作。
