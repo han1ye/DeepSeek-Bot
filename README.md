@@ -13,9 +13,11 @@ English | [中文](README.zh.md)
 
 This fork of [Fei2411/DeepSeek-Bot](https://github.com/Fei2411/DeepSeek-Bot) adds an embedded companion entry to the original DSH interface. DSH keeps its sidebar, workspaces, New chat, Plugins, account and global settings. **🐳 大肥鱼** opens the Main Bot's continuing chat, with a collapsible details panel and an in-page selector for other Bots and group chats. Bot settings open from **Manage team**. Ordinary conversations use DSH's original chat interface.
 
+The **Companions** button next to **Manage team** opens a searchable avatar panel for Bots and groups, reusing upstream characters and work status. Opening an archived Bot restores only its current chat before navigating, so sending a message or changing permissions does not return to the home screen. Historical parts stay archived; leaving during restoration cancels the pending navigation.
+
 The Bot runtime, memory, context management, delegation and groups come from upstream. This change adds the companion navigation and scopes the Bot UI to its own conversations; it does not add a new memory engine or messaging channels. New teams start with 大肥鱼; existing teams keep their names and data. Plugin update checks are off by default, and installing this fork does not override DSH's global search provider.
 
-For this fork, use a local package built with `npm ci` then `npm run build` and `npm pack` in `ds-bot/`. In DSH **Plugins**, install the resulting `ds-bot-0.2.0-myagent.1.tgz` and restart DSH. It keeps the package name `ds-bot`, so it replaces that plugin rather than installing a second team. The npm package and upstream downloads below still install the upstream UI. This fork has not published an npm release or desktop installer.
+For this fork, use a local package built with `npm ci` then `npm run build` and `npm pack` in `ds-bot/`. In DSH **Plugins**, install the resulting `ds-bot-0.2.0-myagent.2.tgz` and restart DSH. It keeps the package name `ds-bot`, so it replaces that plugin rather than installing a second team. The npm package and upstream downloads below still install the upstream UI. This fork has not published an npm release or desktop installer.
 
 See the [design and verification notes](docs/plans/2026-10-22-embedded-companion.md). The remainder of this README describes upstream features and distributions; its screenshots show the upstream UI.
 

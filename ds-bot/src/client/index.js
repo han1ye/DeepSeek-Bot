@@ -9,7 +9,7 @@ import { COMPONENT_CSS, CONVERSATION_CSS, installStyles, installCompiledStyles }
 import { lookOf } from './mark.js'
 import { openHarnessOnboarding, openHarnessSettings } from './sidebar.js'
 import { COMPANION_PANEL, COMPANION_NAME, COMPANION_ENTRY_CSS, COMPANION_TEAM_CSS, CompanionIcon, CompanionLanding } from './companion.js'
-import { companionGroups, nextCompanionPart } from './companion-navigation.js'
+import { companionGroups, nextCompanionPart, companionOpener } from './companion-navigation.js'
 import { HeaderPill } from './header.js'
 import { ComposerPlus, ComposerVoice, menuIcons } from './composer.js'
 import { CHATS_SOURCE, atSources } from './at-menu.js'
@@ -41,7 +41,7 @@ import { USER_MESSAGE_CSS, UserMessageCell, canDrawUserMessages } from './user-m
 import { noticeApprovals } from './approval-notices.js'
 import { listedOpener } from './open-listed.js'
 
-export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout']
+export const inject = ['sessions', 'workspaces', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout']
 
 export function apply(ctx) {
   ctx.effect(() => installLocale(ctx.get('locale')), 'ds-bot: interface copy')
@@ -333,16 +333,21 @@ export function apply(ctx) {
   }
   const mainView = () => Object.values(ctx.sessions.list.getSnapshot().byId ?? {}).find(session => (session?.retainedBy?.mainView ?? 0) > 0)?.id
   const show = listedOpener({ list: ctx.sessions.list, refresh: () => Promise.resolve(ctx.sessions.refresh?.()).catch(quietly('refresh sessions')), open: target => ctx.uiWorkspace.openSession(target), current: () => `${mainView() ?? ''}:${ctx.layout.panelInfo.getSnapshot().activePanelId ?? ''}` })
+  const companion = companionOpener({ roster, sessions: ctx.sessions, workspaces, layout: ctx.layout, open: target => ctx.uiWorkspace.openSession(target) })
+  ctx.effect(() => () => companion.dispose(), 'ds-bot: companion opening lifetime')
   const actions = {
     ...teamActions({ call, after, partFor, roster, ui, live, cards, heldCards, turnClock }),
     // The full-pane overlays sit above the conversation, so opening one must dismiss them
     // or the click appears to do nothing.
     isAgentSession: id => isAgentSessionId(id),
-    openSession: (id) => {
+    openSession: (id, options) => {
       // A DSH Agent Session id lands on the plain surface, not the Bot skin.
       if (isAgentSessionId(id)) return actions.openAgentSession(id)
       ui.set(state => (state.newChat || state.exchange || state.menu || state.palette ? { ...state, newChat: null, exchange: null, menu: null, palette: null } : state))
       const target = partFor(id)
+      if (roster.getSnapshot().byId[id] || roster.getSnapshot().roomsById[id]) {
+        return companion.open(id, options).catch(error => { actions.reportError(error, 'open-companion'); return null })
+      }
       show(target)
     },
     // The conversation replacements withdraw for a plain Session; set the surface
@@ -411,8 +416,8 @@ export function apply(ctx) {
     selectPanel: (id) => { ctx.layout.selectPanel(id) },
     toggleSidebar: () => { ctx.layout.toggleSidebar() },
     openCompanion: (id) => {
-      actions.openSession(id)
-      actions.showDetails(partFor(id))
+      ui.set(state => ({ ...state, newChat: null, exchange: null, menu: null, palette: null }))
+      return companion.open(id, { onOpened: target => actions.showDetails(target) })
     },
     markUnread: id => writeUnread(id, true),
     beginVisit: (id) => {
@@ -649,6 +654,7 @@ export function apply(ctx) {
   // adopts a session, and only an owned chat follows its own context rollover.
   ctx.effect(() => {
     let previousBot
+    let followingPart
     const sync = () => {
       const list = ctx.sessions.list.getSnapshot()
       const main = Object.values(list.byId ?? {}).find(session => (session?.retainedBy?.mainView ?? 0) > 0)?.id
@@ -663,7 +669,10 @@ export function apply(ctx) {
       if (panel !== null || !snapshot.ready) return
       const next = nextCompanionPart(snapshot, main ?? previousBot)
       if (main !== undefined) previousBot = snapshot.byId[main] ? main : undefined
-      if (next) actions.openSession(next)
+      if (next && followingPart !== next) {
+        followingPart = next
+        void actions.openSession(next, { restore: false }).finally(() => { if (followingPart === next) followingPart = undefined })
+      }
     }
     const offList = ctx.sessions.list.subscribe(sync)
     const offRoster = roster.subscribe(sync)

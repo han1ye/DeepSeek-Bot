@@ -1,6 +1,8 @@
 # ds-bot
 
-> **MyAgent fork, 0.2.0-myagent.1:** this build keeps the original DSH sidebar and global settings. Use **🐳 大肥鱼** to open the companion; use **Manage team** inside its chat for Bot settings and the adjacent selector for Bots and groups. Ordinary chats retain the native DSH interface. Build a local `.tgz` with `npm run build` and `npm pack`; installing `ds-bot` from npm selects upstream instead. The package identity is unchanged, so this build replaces an installed DS Bot. New teams use 大肥鱼; existing names and data are preserved. The feature reference below describes the reused upstream runtime.
+> **MyAgent fork, 0.2.0-myagent.2:** this build keeps the original DSH sidebar and global settings. Use **🐳 大肥鱼** to open the companion; use **Manage team** inside its chat for Bot settings and the adjacent selector for Bots and groups. Ordinary chats retain the native DSH interface. Build a local `.tgz` with `npm run build` and `npm pack`; installing `ds-bot` from npm selects upstream instead. The package identity is unchanged, so this build replaces an installed DS Bot. New teams use 大肥鱼; existing names and data are preserved. The feature reference below describes the reused upstream runtime.
+
+The companion selector is a searchable avatar panel beside **Manage team**. An explicit visit to an archived Bot or group restores its current conversation before opening; previous conversation parts remain archived. Native navigation cancels a pending visit.
 
 The DS Bot plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh). It turns dsh into a team of long-lived Bots that talk to you, to each other and in group chats. See the [project page](../README.md) for an overview, install steps and screenshots.
 

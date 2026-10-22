@@ -28,7 +28,18 @@ flowchart LR
 
 ## Distribution
 
-The package remains `ds-bot` and uses version `0.2.0-myagent.1`, so a local package replaces the upstream plugin without creating another team. New teams default to 大肥鱼; the host does not rename existing teams. Update checks default to off to avoid presenting an upstream package as a fork update. This is not an npm publication.
+### Avatar team picker and archived conversation recovery
+
+The owner chose to keep Bot selection beside Manage team, replacing the native select with an avatar panel. The original DSH workspace browser remains in place. The briefly considered sidebar replacement is not part of this build.
+
+- The header button opens a non-modal, searchable Bot/group panel. Reuse upstream `BotAvatar`, `RoomAvatar`, `botState` and work/status sources; do not retain chats to render cards. Mark the selected conversation and Main Bots. Use a compact avatar trigger at narrow widths; management remains available inside the panel.
+- Escape returns focus to the trigger; outside clicks and focus leaving dismiss the panel. Search, arrow navigation and native button keyboard activation remain available. Navigation failures leave a retryable error in the panel.
+- DSH clears an archived `mainView` on its next state update. Previously, releasing an ordinary chat could trigger that clear on the first entry click, while a second click from an empty main view appeared to work until sending or changing permissions.
+- Use `workspaces.list`, `workspaces.unarchiveSession`, `sessions.refresh`, `layout.beginNavigation` and `uiWorkspace.openSession`. Wait for the archive baseline, resolve the Bot's current part, restore that part on an explicit visit, then navigate and open details. Never restore every historical part or restore during background rollover following.
+- A later native navigation or plugin unload cancels the pending UI commit. Timeouts and restoration errors are surfaced; missing identities are not recreated. A restoration already committed on the host cannot be undone by cancelling navigation.
+- `test/companion-navigation.test.js` covers current-part restoration, groups, no background restoration, projection readiness, rollover, native cancellation, missing targets, errors, timeouts and disposal. The isolated browser check includes the actual native Archive action, opening from an ordinary chat, permission changes and sending afterward.
+
+The package remains `ds-bot` and uses version `0.2.0-myagent.2`, so a local package replaces the upstream plugin without creating another team. New teams default to 大肥鱼; the host does not rename existing teams. Update checks default to off to avoid presenting an upstream package as a fork update. This is not an npm publication.
 
 The earlier `dsh-myagent` prototype is a separate plugin with separate data. This change does not migrate its memory or remove its sidebar entry. If both plugins are enabled, their entry labels can coincide. Do not imply that their stored memories have merged.
 
@@ -57,3 +68,10 @@ Run `npm test`, `node scripts/build-client.mjs --check` and `npm run lint` in `d
 - Browser flow passed, including the header at 1024px, details reopen, team/group switching, an ordinary chat reply and the original global-settings dialog. No unhandled browser errors.
 - No host implementation files changed. Upstream identity/memory scopes remain in place; this release does not add a stricter backend boundary around the team tools that upstream exposes to ordinary sessions.
 - Test data and screenshots stay in ignored `.dsh-test-*` folders. The user's DSH profile was not modified.
+
+### 0.2.0-myagent.2 verification
+
+- Unit suite: 842 passed, 0 failed, 1 skipped (the same Windows path-name case). Build check passed; lint passed with 11 existing warnings.
+- Isolated Edge/DSH Web flow passed: avatar picker, filtering and no-results state, keyboard navigation, Escape focus return, Bot/group switching, native workspace/chat/settings flows, and archive → ordinary chat → single-click companion entry → permission changes → message reply. No unhandled browser errors.
+- Inspected light and dark picker screenshots; verified bounds at 1024×700, outside-click dismissal, compact-header access to team management and reduced-motion rendering.
+- Package version updated to `0.2.0-myagent.2`. No DSH core files, host implementation files or user desktop data changed. Desktop acceptance remains a separate step after installing the package.

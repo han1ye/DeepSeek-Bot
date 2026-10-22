@@ -8,6 +8,12 @@ const ZH = {
   'Opening your companion…': '正在打开伙伴对话…',
   'Bot team': '伙伴团队',
   'Manage team': '管理团队',
+  'Companions': '伙伴',
+  'Switch companion': '切换伙伴',
+  'Find a Bot or group': '搜索 Bot 或群聊',
+  'Waiting for teammates': '等待伙伴协作',
+  'This conversation is unavailable. Refresh the team and try again.': '该对话暂不可用，请刷新团队后重试。',
+  'The conversation did not become ready. Please try again.': '对话尚未准备好，请重试。',
   // Shared
   'Main Bot': '主 Bot',
   Working: '工作中',
