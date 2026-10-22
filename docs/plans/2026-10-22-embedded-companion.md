@@ -45,6 +45,14 @@ The earlier `dsh-myagent` prototype is a separate plugin with separate data. Thi
 
 ## Verification
 
+### Glass skin compatibility (.5)
+
+A wallpaper skin can repaint native user bubbles with a body-qualified `background-color: ... !important` rule. The earlier companion override had lower specificity: the skin's white surface won while the companion's near-white ink remained (measured contrast 1.03:1). Messages and QQ delivery were intact.
+
+The conversation surface now owns a temporary `data-bt-conversation` marker. A rule scoped to that marker, the chat flow and user-side message kinds keeps the Bot surface/ink pair together for native and custom user bubbles. Tooltips are excluded. Disposing the conversation removes both the rule and marker; ordinary chats retain the host/skin colors. No skin settings or DSH files are changed.
+
+`dev/bubble-ui.mjs` reproduces the background-only override in a real browser, then checks computed contrast in light/dark modes with the skin loaded before and after the companion. Leaving for an ordinary chat verifies the marker is gone and native text remains readable on the skin's background. Run it against the initialized isolated mock bench, for example `node ds-bot/dev/bubble-ui.mjs .dsh-test-ui .dsh-test-im/web.log 3099` from the repository root.
+
 Unit coverage in `test/companion-navigation.test.js` covers owned conversations, groups, ordinary sessions, a Bot retained behind another main panel, and current-part resolution. The existing header tests remain applicable.
 
 `dev/companion-ui.mjs` exercises the plugin against an isolated mock-model DSH Web profile. It checks native navigation, companion replies, detail spacing and reopening, other Bots and groups, Plugins navigation, an ordinary chat's reply and native model/permission controls, and access to global settings. It writes screenshots only into the ignored bench directory. No real account, model credentials or user DSH data are needed.

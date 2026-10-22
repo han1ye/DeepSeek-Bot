@@ -3163,7 +3163,10 @@ div:has(> nav [class*="_marks"]){display:none!important}
 /* Every user-side bubble (sent, steering mid-turn, not yet admitted, question replies)
    takes its surface and its text from the one --bt-user pair: a skin that repaints
    the host's bubble surface alone would otherwise leave the text unreadable. */
-[class*="_userRow"] [class*="_bubble"],[data-chat-flow-kind=question-reply] [class*="_bubble"],[data-chat-flow-kind=command-input] [class*="_bubble"]{background:var(--bt-user)!important;color:var(--bt-user-ink)!important;border-radius:18px!important;padding:7px 12px!important;font-size:var(--dsh-content-font-size,14px)!important;line-height:calc(var(--dsh-content-font-size,14px) + 8px)!important}
+[class*="_userRow"] [class*="_bubble"]:not([role=tooltip]),[data-chat-flow-kind=question-reply] [class*="_bubble"]:not([role=tooltip]),[data-chat-flow-kind=command-input] [class*="_bubble"]:not([role=tooltip]){background:var(--bt-user)!important;color:var(--bt-user-ink)!important;border-radius:18px!important;padding:7px 12px!important;font-size:var(--dsh-content-font-size,14px)!important;line-height:calc(var(--dsh-content-font-size,14px) + 8px)!important}
+/* Glass skins can override the native bubble background with !important and a
+   body-qualified selector. Keep the ink/surface pair together only in Bot chats. */
+body[data-bt-conversation] [data-chat-flow] :is([data-chat-flow-kind=user],[data-chat-flow-kind=steering],[data-chat-flow-kind=question-reply],[data-chat-flow-kind=command-input]) :is(.bt-ubody,.bt-ububble,[class*="_bubble"]):not([role=tooltip]){background:var(--bt-user)!important;color:var(--bt-user-ink)!important}
 [class*="_userRow"] [class*="_bubble"] [class*="_markdown"],[class*="_userRow"] [class*="_bubble"] a{color:inherit}
 /* Sent messages get the hover toolbar below; steering and unsent bubbles keep none. */
 [class*="_userRow"] [class*="_actions"]{display:none!important}
@@ -16751,6 +16754,12 @@ function apply(ctx) {
     () => shadow("shell.overlay", { id: "bot-toast", order: 60, inject: face }, ErrorToast)
   ];
   const installConversation = () => [
+    () => {
+      document.body.dataset.btConversation = "";
+      return () => {
+        delete document.body.dataset.btConversation;
+      };
+    },
     () => installCompiledStyles(CONVERSATION_CSS, "conversation"),
     () => installMentions(),
     () => installAtMenu(),

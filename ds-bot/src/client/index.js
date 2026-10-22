@@ -612,6 +612,10 @@ export function apply(ctx) {
     () => shadow('shell.overlay', { id: 'bot-toast', order: 60, inject: face }, ErrorToast),
   ]
   const installConversation = () => [
+    () => {
+      document.body.dataset.btConversation = ''
+      return () => { delete document.body.dataset.btConversation }
+    },
     () => installCompiledStyles(CONVERSATION_CSS, 'conversation'),
     () => installMentions(),
     () => installAtMenu(),

@@ -19,7 +19,7 @@ The workspace browser shows ordinary conversations only. Bot chats, group relays
 
 The Bot runtime, memory, context management, delegation and groups come from upstream. This change adds the companion navigation and scopes the Bot UI to its own conversations; it does not add a new memory engine or messaging channels. New teams start with 大肥鱼; existing teams keep their names and data. Plugin update checks are off by default, and installing this fork does not override DSH's global search provider.
 
-For this fork, use a local package built with `npm ci` then `npm run build` and `npm pack` in `ds-bot/`. In DSH **Plugins**, install the resulting `ds-bot-0.2.0-myagent.4.tgz` and restart DSH. It keeps the package name `ds-bot`, so it replaces that plugin rather than installing a second team. The npm package and upstream downloads below still install the upstream UI. This fork has not published an npm release or desktop installer.
+For this fork, use a local package built with `npm ci` then `npm run build` and `npm pack` in `ds-bot/`. In DSH **Plugins**, install the resulting `ds-bot-0.2.0-myagent.5.tgz` and restart DSH. It keeps the package name `ds-bot`, so it replaces that plugin rather than installing a second team. The npm package and upstream downloads below still install the upstream UI. This fork has not published an npm release or desktop installer.
 
 For QQ connectivity, the published `@xmanrui/dsh-im@5.4.0` can bind an existing Bot without changes to this fork. The isolated mock-model bridge and UI checks pass; real QQ account acceptance is tracked separately. See [channel setup, test scope and reproduction](docs/plans/2026-10-22-im-channel-validation.md).
 
