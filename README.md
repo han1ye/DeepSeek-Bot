@@ -21,6 +21,8 @@ The Bot runtime, memory, context management, delegation and groups come from ups
 
 For this fork, use a local package built with `npm ci` then `npm run build` and `npm pack` in `ds-bot/`. In DSH **Plugins**, install the resulting `ds-bot-0.2.0-myagent.4.tgz` and restart DSH. It keeps the package name `ds-bot`, so it replaces that plugin rather than installing a second team. The npm package and upstream downloads below still install the upstream UI. This fork has not published an npm release or desktop installer.
 
+For QQ connectivity, the published `@xmanrui/dsh-im@5.4.0` can bind an existing Bot without changes to this fork. The isolated mock-model bridge and UI checks pass; real QQ account acceptance is tracked separately. See [channel setup, test scope and reproduction](docs/plans/2026-10-22-im-channel-validation.md).
+
 See the [design and verification notes](docs/plans/2026-10-22-embedded-companion.md). The remainder of this README describes upstream features and distributions; its screenshots show the upstream UI.
 
 ![version](https://img.shields.io/badge/version-v0.2_preview-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.2-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)

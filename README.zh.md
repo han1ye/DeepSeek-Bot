@@ -21,6 +21,8 @@ Bot 运行、记忆、上下文管理、委派和群聊复用上游。本次增�
 
 安装本分支：在 `ds-bot/` 中依次运行 `npm ci`、`npm run build`、`npm pack`，然后在 DSH **插件** 页安装生成的 `ds-bot-0.2.0-myagent.4.tgz`，重启 DSH。包名仍为 `ds-bot`，用于替换原插件，不会另建一套团队。下文的 npm 包及上游下载仍然安装上游界面。本分支尚未发布 npm 版本或桌面安装程序。
 
+QQ 接入可使用发布版 `@xmanrui/dsh-im@5.4.0` 的现有 Bot 绑定功能，无需修改本分支。隔离模拟模型环境中的桥接与界面检查已通过；真实 QQ 账号验收单独记录。详见[渠道设置、验证范围与复现方式](docs/plans/2026-10-22-im-channel-validation.md)。
+
 详见[设计与验证说明](docs/plans/2026-10-22-embedded-companion.md)。下文保留上游功能及发行方式说明，截图展示的是上游界面。
 
 ![版本](https://img.shields.io/badge/版本-v0.2_预览-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.2-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)

@@ -1,0 +1,1 @@
+{"name":"myagent-im-smoke","version":"0.0.0","private":true,"type":"module","main":"index.mjs","dsh":{"bundle":{"patch":"cordis.patch.yml"}}}
