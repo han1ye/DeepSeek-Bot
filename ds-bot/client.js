@@ -15595,6 +15595,19 @@ function companionSessionIds(roster) {
   }
   return ids;
 }
+var folderKey = (path) => {
+  if (typeof path !== "string" || !path) return "";
+  const key = path.replace(/\\/g, "/").replace(/\/+$/, "") || "/";
+  return /^[a-z]:(?:\/|$)/i.test(key) || key.startsWith("//") ? key.toLowerCase() : key;
+};
+function companionWorkspaceIds(list, workspaces, roster, owned = companionSessionIds(roster)) {
+  const folders = new Set([...roster.bots ?? [], ...roster.rooms ?? []].map((item) => folderKey(item.workDir)).filter(Boolean));
+  for (const id of owned) {
+    const cwd = folderKey(list.byId[id]?.cwd);
+    if (cwd) folders.add(cwd);
+  }
+  return new Set(workspaces.filter((workspace) => workspace.workspaceId === roster.workspaceId || folders.has(folderKey(workspace.path)) || workspace.sessionIds.some((id) => owned.has(id))).map((workspace) => workspace.workspaceId));
+}
 function ordinaryWorkspaceList(list, workspaces, roster) {
   const hidden = companionSessionIds(roster);
   const ids = roster.ready ? (list.ids ?? []).filter((id) => !hidden.has(id) && list.byId[id]?.origin !== "subagent") : [];
@@ -15603,6 +15616,7 @@ function ordinaryWorkspaceList(list, workspaces, roster) {
     ...list,
     ids,
     byId: Object.fromEntries(ids.map((id) => [id, list.byId[id]]).filter(([, row]) => row)),
+    companionWorkspaceIds: companionWorkspaceIds(list, workspaces, roster, hidden),
     workspaces: workspaces.map((workspace) => ({ ...workspace, sessionIds: workspace.sessionIds.filter((id) => visible.has(id)) }))
   };
 }
@@ -15621,7 +15635,7 @@ function workspaceRows(list, workspaceState, view, current) {
     return base.filter(visible).map((id) => ({ ...list.byId[id], archived: archived.has(id), pinned: pinned.has(id) })).sort((a, b) => Number(b.id === current && b.blank) - Number(a.id === current && a.blank) || Number(b.pinned) - Number(a.pinned));
   };
   const accounted = new Set(list.workspaces.flatMap((workspace) => workspace.sessionIds));
-  const groups = list.workspaces.map((workspace) => ({ key: workspace.workspaceId, workspace, rows: order(workspace.sessionIds, workspace.workspaceId) }));
+  const groups = list.workspaces.map((workspace) => ({ key: workspace.workspaceId, workspace, rows: order(workspace.sessionIds, workspace.workspaceId) })).filter((group) => group.rows.length > 0 || !list.companionWorkspaceIds?.has(group.key));
   const stray = order(list.ids.filter((id) => !accounted.has(id)), "");
   if (stray.length) groups.push({ key: "", rows: stray });
   return { groups: filter === "only" ? groups.filter((group) => group.rows.length) : groups, flat: order(list.ids, "__flat_session_order__") };

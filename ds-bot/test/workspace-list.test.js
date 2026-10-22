@@ -31,13 +31,67 @@ test('projection hides owned rows everywhere without mutating membership, archiv
   assert.deepEqual({ list, state, roster }, before)
 })
 
-test('no unclassified rows appear before initial roster, and empty Bot folders keep ordinary workspace actions', () => {
-  const { list, state } = make()
+test('no unclassified rows appear before initial roster; empty Bot folders disappear without losing membership', () => {
+  const { list, state, view } = make()
   const pending = ordinaryWorkspaceList(list, state.items, { ready: false })
   assert.equal(pending.ids.length, 0)
   const empty = ordinaryWorkspaceList(list, [{ ...state.items[0], sessionIds: ['bot', 'old'] }], roster)
   assert.equal(empty.workspaces.length, 1)
   assert.deepEqual(empty.workspaces[0].sessionIds, [])
+  assert.ok(!workspaceRows(empty, state, view).groups.some(group => group.key === 'mixed'))
+  assert.ok(state.items[0].sessionIds.includes('bot'))
+})
+
+test('empty team and configured companion folders disappear while unrelated empty folders remain', () => {
+  const { list, state, view } = make()
+  const items = [
+    { workspaceId: 'team', title: 'Renamed team', path: 'D:\\team', sessionIds: [] },
+    { workspaceId: 'legacy', title: 'Renamed companion', path: 'D:\\agent\\workspace\\', sessionIds: [] },
+    { workspaceId: 'group-dir', title: 'Group work', path: '/work/group', sessionIds: [] },
+    { workspaceId: 'ordinary-empty', title: 'DS Bot', path: 'D:\\ordinary', sessionIds: [] },
+  ]
+  const configured = { ...roster, workspaceId: 'team', bots: [{ ...roster.bots[0], workDir: 'd:/agent/workspace' }], rooms: [{ ...roster.rooms[0], workDir: '/work/group' }] }
+  const projected = ordinaryWorkspaceList(list, items, configured)
+  const groups = workspaceRows(projected, state, view).groups
+  assert.deepEqual(groups.filter(group => group.workspace).map(group => group.key), ['ordinary-empty'])
+  assert.equal(projected.workspaces.length, 4, 'actual workspace membership is unchanged')
+})
+
+test('a Bot cwd identifies its companion folder even if its Session is ungrouped', () => {
+  const { list, state, view } = make()
+  list.byId.current.cwd = '\\\\server\\share\\agent'
+  const items = [
+    { workspaceId: 'old-companion', path: '//SERVER/share/agent/', sessionIds: [] },
+    { workspaceId: 'similar-path', path: '//server/share/agent2', sessionIds: [] },
+    { workspaceId: 'posix-other-case', path: '/WORK', sessionIds: [] },
+  ]
+  const configured = { ...roster, bots: [{ ...roster.bots[0], workDir: '/work' }] }
+  assert.deepEqual(workspaceRows(ordinaryWorkspaceList(list, items, configured), state, view).groups.filter(group => group.workspace).map(group => group.key), ['similar-path', 'posix-other-case'])
+})
+
+test('mixed assistant folders return for ordinary archived or selected blank rows without revealing Bot rows', () => {
+  const { list, state, view } = make()
+  const items = [{ workspaceId: 'mixed', path: '/team', sessionIds: ['bot', 'archived', 'blank'] }]
+  const projected = ordinaryWorkspaceList(list, items, roster)
+  assert.ok(!workspaceRows(projected, state, view).groups.some(group => group.key === 'mixed'))
+  const archived = workspaceRows(projected, state, { ...view, archivedFilter: 'only' }).groups.find(group => group.key === 'mixed')
+  assert.deepEqual(archived.rows.map(row => row.id), ['archived'])
+  const selected = workspaceRows(projected, state, view, 'blank').groups.find(group => group.key === 'mixed')
+  assert.deepEqual(selected.rows.map(row => row.id), ['blank'])
+  list.byId.blank.blank = false
+  assert.ok(workspaceRows(ordinaryWorkspaceList(list, items, roster), state, view).groups.some(group => group.key === 'mixed'))
+})
+
+test('hiding an empty companion parent leaves ordinary descendant workspaces reachable in tree view', () => {
+  const { list, state, view } = make()
+  const items = [
+    { workspaceId: 'team', path: '/team', sessionIds: [] },
+    { workspaceId: 'project', path: '/team/project', sessionIds: ['ordinary'] },
+  ]
+  const projected = ordinaryWorkspaceList(list, items, { ...roster, workspaceId: 'team' })
+  const tree = workspaceHierarchy(workspaceRows(projected, state, view).groups, true)
+  assert.equal(tree[0].key, 'project')
+  assert.deepEqual(tree[0].rows.map(row => row.id), ['ordinary'])
 })
 
 test('counts, flat view, ungrouped and archive filters derive from ordinary rows only', () => {

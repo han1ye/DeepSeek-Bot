@@ -15,12 +15,32 @@ export function companionSessionIds(roster) {
   return ids
 }
 
+// Host paths can use either separator on Windows; keep POSIX case-sensitive.
+const folderKey = path => {
+  if (typeof path !== 'string' || !path) return ''
+  const key = path.replace(/\\/g, '/').replace(/\/+$/, '') || '/'
+  return /^[a-z]:(?:\/|$)/i.test(key) || key.startsWith('//') ? key.toLowerCase() : key
+}
+
+export function companionWorkspaceIds(list, workspaces, roster, owned = companionSessionIds(roster)) {
+  const folders = new Set([...(roster.bots ?? []), ...(roster.rooms ?? [])].map(item => folderKey(item.workDir)).filter(Boolean))
+  // A Bot's effective cwd also identifies its registered folder when its custom
+  // directory was cleared, or when the folder came from an earlier companion.
+  for (const id of owned) {
+    const cwd = folderKey(list.byId[id]?.cwd)
+    if (cwd) folders.add(cwd)
+  }
+  return new Set(workspaces.filter(workspace => workspace.workspaceId === roster.workspaceId
+    || folders.has(folderKey(workspace.path)) || workspace.sessionIds.some(id => owned.has(id))).map(workspace => workspace.workspaceId))
+}
+
 export function ordinaryWorkspaceList(list, workspaces, roster) {
   const hidden = companionSessionIds(roster)
   const ids = roster.ready ? (list.ids ?? []).filter(id => !hidden.has(id) && list.byId[id]?.origin !== 'subagent') : []
   const visible = new Set(ids)
   return {
     ...list, ids, byId: Object.fromEntries(ids.map(id => [id, list.byId[id]]).filter(([, row]) => row)),
+    companionWorkspaceIds: companionWorkspaceIds(list, workspaces, roster, hidden),
     workspaces: workspaces.map(workspace => ({ ...workspace, sessionIds: workspace.sessionIds.filter(id => visible.has(id)) })),
   }
 }
@@ -42,6 +62,7 @@ export function workspaceRows(list, workspaceState, view, current) {
   }
   const accounted = new Set(list.workspaces.flatMap(workspace => workspace.sessionIds))
   const groups = list.workspaces.map(workspace => ({ key: workspace.workspaceId, workspace, rows: order(workspace.sessionIds, workspace.workspaceId) }))
+    .filter(group => group.rows.length > 0 || !list.companionWorkspaceIds?.has(group.key))
   const stray = order(list.ids.filter(id => !accounted.has(id)), '')
   if (stray.length) groups.push({ key: '', rows: stray })
   return { groups: filter === 'only' ? groups.filter(group => group.rows.length) : groups, flat: order(list.ids, '__flat_session_order__') }

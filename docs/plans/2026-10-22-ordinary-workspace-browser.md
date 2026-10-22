@@ -26,7 +26,7 @@ flowchart LR
 - Exclude each Bot's identity, current Session and historical parts; each group's relay Session and all current/historical member Sessions in `room.parts`.
 - Do not infer ownership from names, path, workspace ID or parent ID. Ordinary DS Agent sessions and ordinary forks remain visible. A normal conversation named Chief in the DS Bot workspace remains normal.
 - Preserve DSH's subagent-origin filtering and selected-blank presentation. Filtering happens before grouping, archive filtering, counting, overflow and search limiting. No transient startup rows render before the roster baseline.
-- Keep actual workspace folders, including empty ones. Hiding Bot rows does not remove a workspace that users can still use for ordinary work.
+- Keep actual workspace registrations. As of .4, hide an assistant-related folder header when its filtered ordinary rows are empty. Recognize these folders using the team's workspace ID, Bot/group work directories, owned Session cwd and owned membership, never a display name. Unrelated empty folders remain visible. A selected blank ordinary chat, ordinary messages, or ordinary archives shown by the current filter restore their folder header. Hidden empty parents do not hide ordinary descendant workspaces in tree view.
 - Never write filtered memberships, pin sets or archive sets back. Reordering a visible subset preserves hidden members in saved positions. All history remains reachable through the companion.
 - This is a browsing change, not a backend authorization or memory isolation boundary. It does not alter upstream tools, context compression, delegation or memory.
 
@@ -46,6 +46,8 @@ Native content search returns at most 20 ranked hits and a `hasMore` flag, witho
 
 Actual DSH Desktop remains a separate acceptance check after installing the local package. No user profile or real model credentials are used by these checks.
 
+`dev/empty-workspace-ui.mjs` adds two registered synthetic assistant folders and an unrelated empty folder. It verifies that both assistant headers disappear while their registrations and the companion remain usable; a new ordinary conversation makes its header visible again, as do archive filters when applicable. The test restores its temporary team/Bot directory settings afterward.
+
 ### 0.2.0-myagent.3 result
 
 - DSH 0.2.1-rc.2, Node 24.14.1, Windows and headless Edge in the isolated mock-model bench.
@@ -54,3 +56,9 @@ Actual DSH Desktop remains a separate acceptance check after installing the loca
 - Companion flow passed, including native settings, ordinary replies and single-click recovery after native-keyboard archiving of the hidden Main Bot.
 - Workspace flow passed, including a real group member work session, title/content search isolation, same-name ordinary chat, pin/rename/archive/restore, and folder add/rename/collapse/remove. Active-work archive confirmation and cancellation also passed.
 - Inspected light/dark workspace screenshots and exercised the 1024px layout. Browser checks reported no unhandled errors. No DSH core or host implementation changed.
+
+### 0.2.0-myagent.4 result
+
+- Hide empty assistant folder headers, including a separately registered custom companion directory, without deleting registrations or filtering unrelated empty workspaces.
+- Full suite: 854 passed, 0 failed, 1 skipped (the existing Windows case). Generated client check and lint passed; lint retained the same 11 warnings.
+- Isolated Edge check passed: both empty assistant headers disappear; an unrelated empty folder and the Bot chat remain; a selected blank or ordinary conversation restores its folder; archive filters expose ordinary archives when requested. Inspected the resulting sidebar screenshot. No user DSH profile or host implementation changed.
