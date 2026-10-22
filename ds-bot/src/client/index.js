@@ -40,6 +40,7 @@ import { MEMBER_CSS, MemberDock } from './member-status.js'
 import { USER_MESSAGE_CSS, UserMessageCell, canDrawUserMessages } from './user-message.js'
 import { noticeApprovals } from './approval-notices.js'
 import { listedOpener } from './open-listed.js'
+import { installWorkspaceBrowser, WORKSPACE_BROWSER_CSS } from './workspace-browser.js'
 
 export const inject = ['sessions', 'workspaces', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout']
 
@@ -649,6 +650,8 @@ export function apply(ctx) {
   ctx.effect(() => installCompiledStyles(COMPANION_ENTRY_CSS, 'companion-entry'), 'ds-bot: companion entry styles')
   shadow('main', { key: COMPANION_PANEL, inject: face }, CompanionLanding)
   shadow('sidebar.panellist', { id: COMPANION_PANEL, order: -100, label: COMPANION_NAME }, CompanionIcon)
+  ctx.effect(() => installCompiledStyles(WORKSPACE_BROWSER_CSS, 'workspace-browser'), 'ds-bot: ordinary workspace styles')
+  ctx.slots.inject('sidebar.workspaces', () => installWorkspaceBrowser(ctx, roster, async () => { await pull(); await ctx.sessions.refresh() }))
 
   // A retained Bot session may sit behind another panel. Ordinary navigation never
   // adopts a session, and only an owned chat follows its own context rollover.

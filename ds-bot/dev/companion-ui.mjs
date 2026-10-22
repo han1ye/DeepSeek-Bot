@@ -154,10 +154,9 @@ try {
   await entry().click()
   await page.locator('.bt-panel').waitFor()
   const main = (await api('state')).bots.find(bot => bot.id === mainId)
-  const rowActions = page.locator(`button[aria-label="会话“${main.name}”的操作"]`)
-  await rowActions.locator('..').locator('..').locator('..').hover()
-  await rowActions.click()
-  await page.getByRole('menuitem', { name: /归档会话|Archive session/ }).click()
+  assert.equal(await page.locator(`.bt-ws-browser [data-session-id="${main.sessionId}"]`).count(), 0)
+  // The native archive shortcut remains available for a hidden current Bot.
+  await page.keyboard.press('Control+Alt+KeyA')
   await noCompanion()
   await page.getByText(/^收到：Generate the session title/).first().click()
   await noCompanion()

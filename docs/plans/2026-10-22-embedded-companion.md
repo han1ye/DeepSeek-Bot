@@ -4,7 +4,7 @@ This is the MyAgent fork's first UI change, requested by its owner. It differs f
 
 ## Boundaries
 
-- DSH owns branding, sidebar, workspaces, New chat, Plugins, scheduled tasks, account, global settings and shortcuts.
+- DSH owns branding, surrounding sidebar, workspace data, New chat, Plugins, scheduled tasks, account, global settings and shortcuts. Version .3 replaces only the workspace browser through its public slot; see the [ordinary browser amendment](2026-10-22-ordinary-workspace-browser.md).
 - One registered `sidebar.panellist` entry opens a keyed `main` landing panel. Once the roster is ready, it opens the Main Bot's current conversation through `uiWorkspace.openSession`.
 - A visible conversation owned by the Bot roster mounts upstream chat cells, overlays and details. The header selects another Bot or group and opens team settings. The details panel can collapse.
 - Another main panel or an ordinary conversation withdraws these replacements and clears companion overlays and reserved panel space. No ordinary session is automatically adopted into a Bot or Agent.
@@ -30,7 +30,7 @@ flowchart LR
 
 ### Avatar team picker and archived conversation recovery
 
-The owner chose to keep Bot selection beside Manage team, replacing the native select with an avatar panel. The original DSH workspace browser remains in place. The briefly considered sidebar replacement is not part of this build.
+For version .2, the owner chose to keep Bot selection beside Manage team, replacing the native select with an avatar panel. That release kept the original DSH workspace browser. The subsequent .3 amendment hides Bot-owned rows using a replacement workspace browser; it does not move the team picker into the sidebar.
 
 - The header button opens a non-modal, searchable Bot/group panel. Reuse upstream `BotAvatar`, `RoomAvatar`, `botState` and work/status sources; do not retain chats to render cards. Mark the selected conversation and Main Bots. Use a compact avatar trigger at narrow widths; management remains available inside the panel.
 - Escape returns focus to the trigger; outside clicks and focus leaving dismiss the panel. Search, arrow navigation and native button keyboard activation remain available. Navigation failures leave a retryable error in the panel.

@@ -42,6 +42,45 @@ module.exports = __toCommonJS(index_exports);
 // src/client/i18n.js
 var NAMESPACE = "ds-bot";
 var ZH = {
+  Retry: "重试",
+  "Stop and archive": "停止并归档",
+  "This conversation still has active work. Stop it and archive the conversation?": "该会话仍有正在进行的任务。要停止任务并归档会话吗？",
+  "Ordinary conversations": "普通会话",
+  "Workspaces": "工作区",
+  "Default workspace": "默认工作区",
+  "Ungrouped": "未分组",
+  "Untitled": "未命名",
+  "Workspace actions": "工作区操作",
+  "Workspace actions for {name}": "工作区“{name}”的操作",
+  "Session actions for {name}": "会话“{name}”的操作",
+  "Search ordinary conversations": "搜索普通会话",
+  "Search conversations": "搜索会话",
+  "Close search": "关闭搜索",
+  "Workspace view options": "工作区视图选项",
+  "Add workspace": "添加工作区",
+  "Rename workspace": "重命名工作区",
+  "Remove workspace": "移除工作区",
+  "Remove this workspace from the list? Files and conversations are kept.": "从列表移除这个工作区？文件和会话记录会保留。",
+  "Group by workspace": "按工作区分组",
+  "Workspace tree": "工作区目录树",
+  "All conversations": "所有会话",
+  "Most recent first": "最近活跃优先",
+  "Manual order": "手动排序",
+  "Hide archived": "隐藏已归档",
+  "Show archived": "显示已归档",
+  "Archived only": "仅已归档",
+  "Archive session": "归档会话",
+  "Unarchive": "取消归档",
+  "Fork conversation": "分支会话",
+  "Copy session ID": "复制会话 ID",
+  "No conversations": "暂无会话",
+  "No matching conversations": "没有匹配的普通会话",
+  "Searching…": "搜索中…",
+  "{count} conversations": "{count} 个会话",
+  "Show {count} more": "展开其余 {count} 个",
+  "Content search is limited. Refine your query for more results.": "内容搜索结果有数量限制，请细化关键词。",
+  "Content search failed; showing title matches.": "内容搜索失败，当前显示标题匹配结果。",
+  "This action is unavailable. Reload DSH and try again.": "该操作暂不可用，请重新加载 DSH 后重试。",
   "Opening your companion…": "正在打开伙伴对话…",
   "Bot team": "伙伴团队",
   "Manage team": "管理团队",
@@ -1308,8 +1347,8 @@ function bodyOf(def, paint, flat = false) {
     return "";
   }
 }
-var eyeMarkup = ([cx, cy, w, h40, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><rect class="bt-eye" x="${-w / 2}" y="${-h40 / 2}" width="${w}" height="${h40}" rx="${w / 2}"/></g>`;
-var happyEyeMarkup = ([cx, cy, w, h40, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><path class="bt-eye-happy" opacity="0" d="M${-w * 0.62} ${h40 * 0.14}Q0 ${-h40 * 0.42} ${w * 0.62} ${h40 * 0.14}" fill="none" stroke="#000" stroke-width="${w * 0.5}" stroke-linecap="round"/></g>`;
+var eyeMarkup = ([cx, cy, w, h41, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><rect class="bt-eye" x="${-w / 2}" y="${-h41 / 2}" width="${w}" height="${h41}" rx="${w / 2}"/></g>`;
+var happyEyeMarkup = ([cx, cy, w, h41, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><path class="bt-eye-happy" opacity="0" d="M${-w * 0.62} ${h41 * 0.14}Q0 ${-h41 * 0.42} ${w * 0.62} ${h41 * 0.14}" fill="none" stroke="#000" stroke-width="${w * 0.5}" stroke-linecap="round"/></g>`;
 var maskBox = (size) => `maskUnits="userSpaceOnUse" x="${-size}" y="${-size}" width="${size * 3}" height="${size * 3}"`;
 var holes = (def, eyes) => `<rect x="${-def.size}" y="${-def.size}" width="${def.size * 3}" height="${def.size * 3}" fill="#fff"/>${eyes}`;
 var MASK_ID = "%MASK%";
@@ -2005,12 +2044,12 @@ function liveSprings(apply2) {
     const dt = Math.min(0.5, Math.max(1e-3, (now - last) / 1e3));
     last = now;
     const steps = Math.ceil(dt * 240);
-    const h40 = dt / steps;
+    const h41 = dt / steps;
     let moving = false;
     for (const value of values.values()) {
       for (let index = 0; index < steps; index += 1) {
-        value.v += (-value.k * (value.x - value.to) - value.c * value.v) * h40;
-        value.x += value.v * h40;
+        value.v += (-value.k * (value.x - value.to) - value.c * value.v) * h41;
+        value.x += value.v * h41;
       }
       if (Math.abs(value.x - value.to) < 0.05 && Math.abs(value.v) < 1) {
         value.x = value.to;
@@ -15539,6 +15578,592 @@ function listedOpener({ list, open, refresh, current }) {
   };
 }
 
+// src/client/workspace-list.js
+function companionSessionIds(roster) {
+  const ids = /* @__PURE__ */ new Set();
+  const add = (id) => {
+    if (typeof id === "string" && id) ids.add(id);
+  };
+  for (const bot of roster.bots ?? []) {
+    add(bot.id);
+    add(bot.sessionId);
+    for (const id of bot.parts ?? []) add(id);
+  }
+  for (const room2 of roster.rooms ?? []) {
+    add(room2.id);
+    for (const id of room2.parts ?? []) add(id);
+  }
+  return ids;
+}
+function ordinaryWorkspaceList(list, workspaces, roster) {
+  const hidden = companionSessionIds(roster);
+  const ids = roster.ready ? (list.ids ?? []).filter((id) => !hidden.has(id) && list.byId[id]?.origin !== "subagent") : [];
+  const visible = new Set(ids);
+  return {
+    ...list,
+    ids,
+    byId: Object.fromEntries(ids.map((id) => [id, list.byId[id]]).filter(([, row]) => row)),
+    workspaces: workspaces.map((workspace) => ({ ...workspace, sessionIds: workspace.sessionIds.filter((id) => visible.has(id)) }))
+  };
+}
+function workspaceRows(list, workspaceState, view, current) {
+  const archived = new Set(workspaceState.archivedSessionIds);
+  const pinned = new Set(workspaceState.pinnedSessionIds);
+  const filter = view.archivedFilter ?? "default";
+  const visible = (id) => {
+    const row = list.byId[id];
+    return row && (!row.blank || id === current) && (filter === "show" || archived.has(id) === (filter === "only"));
+  };
+  const order = (ids, key) => {
+    const saved = view.sessionOrderByAccount?.[key] ?? [];
+    const recency = [...ids].sort((a, b) => (list.byId[b]?.updatedAt ?? 0) - (list.byId[a]?.updatedAt ?? 0) || a.localeCompare(b));
+    const base = view.orderBy === "manual" ? [...saved.filter((id) => ids.includes(id)), ...recency.filter((id) => !saved.includes(id))] : recency;
+    return base.filter(visible).map((id) => ({ ...list.byId[id], archived: archived.has(id), pinned: pinned.has(id) })).sort((a, b) => Number(b.id === current && b.blank) - Number(a.id === current && a.blank) || Number(b.pinned) - Number(a.pinned));
+  };
+  const accounted = new Set(list.workspaces.flatMap((workspace) => workspace.sessionIds));
+  const groups = list.workspaces.map((workspace) => ({ key: workspace.workspaceId, workspace, rows: order(workspace.sessionIds, workspace.workspaceId) }));
+  const stray = order(list.ids.filter((id) => !accounted.has(id)), "");
+  if (stray.length) groups.push({ key: "", rows: stray });
+  return { groups: filter === "only" ? groups.filter((group) => group.rows.length) : groups, flat: order(list.ids, "__flat_session_order__") };
+}
+function searchWorkspaceRows(rows, workspaces, query, remote = { items: [], hasMore: false }, limit = 20) {
+  const wanted = query.trim().toLocaleLowerCase();
+  const workspaceOf = new Map(workspaces.flatMap((workspace) => workspace.sessionIds.map((id) => [id, workspace])));
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const hits = /* @__PURE__ */ new Map();
+  for (const row of [...rows].sort((a, b) => b.updatedAt - a.updatedAt)) {
+    const workspace = workspaceOf.get(row.id);
+    if (`${row.displayTitle ?? row.title ?? ""} ${workspace?.title ?? ""} ${workspace?.path ?? workspace?.cwd ?? ""}`.toLocaleLowerCase().includes(wanted)) hits.set(row.id, row);
+  }
+  for (const item of remote.items) {
+    const row = byId.get(item.sessionId);
+    if (row) hits.set(row.id, { ...row, snippet: item.snippet });
+  }
+  return { items: [...hits.values()].slice(0, limit), hasMore: remote.hasMore || hits.size > limit };
+}
+function workspaceHierarchy(groups, nested) {
+  if (!nested) return groups.map((group) => ({ ...group, children: [] }));
+  const nodes = groups.map((group) => ({ ...group, children: [] }));
+  const pathOf = (node) => (node.workspace?.path ?? node.workspace?.cwd ?? "").replace(/\\/g, "/").replace(/\/$/, "");
+  const roots = [];
+  for (const node of nodes) {
+    const path = pathOf(node);
+    const parent = path ? nodes.filter((other) => other !== node && pathOf(other) && path.startsWith(`${pathOf(other)}/`)).sort((a, b) => pathOf(b).length - pathOf(a).length)[0] : void 0;
+    if (parent) parent.children.push(node);
+    else roots.push(node);
+  }
+  return roots;
+}
+function reorderVisible(saved, members, visible, from, before) {
+  if (!visible.includes(from) || !visible.includes(before) || from === before) return saved;
+  const order = visible.filter((id) => id !== from);
+  order.splice(order.indexOf(before), 0, from);
+  const base = [.../* @__PURE__ */ new Set([...saved.filter((id) => members.includes(id)), ...members])];
+  let cursor = 0;
+  return base.map((id) => visible.includes(id) ? order[cursor++] : id);
+}
+
+// src/client/workspace-browser.js
+var import_react42 = require("react");
+var import_react_dom11 = require("react-dom");
+var titleOf2 = (row) => row.blank ? t("New chat") : row.displayTitle || row.title || t("Untitled");
+var workspaceTitle = (workspace) => !workspace ? t("Ungrouped") : workspace.title === "default-workspace" ? t("Default workspace") : workspace.title;
+function installWorkspaceBrowser(ctx, roster, refreshRoster) {
+  const name = "sidebar.workspaces";
+  let source;
+  let dispose;
+  let ownInject;
+  const rowAction = (id, method, ...args) => {
+    if (id === "session-id" && method === "copySessionId") return navigator.clipboard.writeText(args[0]);
+    if (id === "fork" && method === "forkSession") return ctx.uiWorkspace.forkSession(args[0], void 0, { allowMigration: false });
+    if (id === "pin" && ["pinSession", "unpinSession"].includes(method)) return ctx.uiWorkspace[method](...args);
+    if (id === "archive" && ["archiveSession", "unarchiveSession"].includes(method)) return ctx.uiWorkspace[method](...args);
+    throw new Error(t("This action is unavailable. Reload DSH and try again."));
+  };
+  const workspaceActions = {
+    rowAction,
+    refresh: refreshRoster,
+    pickDirectory: () => ctx.uiWorkspace.pickDirectory(),
+    listDirectory: (path, signal) => ctx.uiWorkspace.listDirectory(path, signal)
+  };
+  const sync = () => {
+    const entries2 = ctx.slots.entries(name).filter((entry) => entry.inject !== ownInject);
+    const next = entries2.find((entry) => entry.store && typeof entry.inject === "function");
+    if (next === source && dispose) return;
+    dispose?.();
+    dispose = void 0;
+    source = next;
+    if (!source) return;
+    ownInject = (...args) => {
+      const native = source.inject(...args);
+      return { ...native, hooks: { ...native.hooks, roster }, workspaceActions };
+    };
+    dispose = ctx.slots.register({ name, store: source.store, inject: ownInject, priority: freePriority(entries2, { priority: -100 }) }, OrdinaryWorkspaceBrowser);
+  };
+  const unsubscribe = ctx.slots.subscribe(name, sync);
+  try {
+    sync();
+  } catch (error) {
+    unsubscribe();
+    throw error;
+  }
+  return () => {
+    unsubscribe();
+    dispose?.();
+  };
+}
+function Popup({ anchor, close, children, label }) {
+  const ref = (0, import_react42.useRef)(null);
+  const [place, setPlace] = (0, import_react42.useState)(null);
+  (0, import_react42.useEffect)(() => {
+    const previous = document.activeElement;
+    const bounds = anchor.getBoundingClientRect();
+    const menu = ref.current;
+    setPlace({ left: Math.max(8, Math.min(bounds.left, window.innerWidth - 248)), top: Math.max(8, Math.min(bounds.bottom + 4, window.innerHeight - menu.offsetHeight - 8)) });
+    menu.querySelector("button:not(:disabled)")?.focus();
+    const outside = (event) => {
+      if (!menu.contains(event.target) && !anchor.contains(event.target)) close();
+    };
+    const key = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        close();
+        previous?.focus();
+      }
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const buttons = [...menu.querySelectorAll("button:not(:disabled)")];
+        const index = buttons.indexOf(document.activeElement);
+        buttons[(index + buttons.length + (event.key === "ArrowDown" ? 1 : -1)) % buttons.length]?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("focusin", outside);
+    document.addEventListener("keydown", key, true);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("focusin", outside);
+      document.removeEventListener("keydown", key, true);
+    };
+  }, [anchor, close]);
+  return (0, import_react_dom11.createPortal)((0, import_react42.createElement)("div", { className: "bt-ws-popup", ref, role: "menu", "aria-label": label, style: { ...place, visibility: place ? void 0 : "hidden" } }, children), document.body);
+}
+function WorkspaceDialog({ dialog, close, createWorkspace, renameWorkspace, deleteWorkspace, workspaceActions, startSession }) {
+  const ref = (0, import_react42.useRef)(null);
+  const [value, setValue] = (0, import_react42.useState)(dialog.workspace?.title ?? "");
+  const [listing, setListing] = (0, import_react42.useState)(null);
+  const [busy, setBusy] = (0, import_react42.useState)(false);
+  const [error, setError] = (0, import_react42.useState)("");
+  const live = (0, import_react42.useRef)(true);
+  const scan = (0, import_react42.useRef)(null);
+  (0, import_react42.useEffect)(() => {
+    live.current = true;
+    const previous = document.activeElement;
+    const node = ref.current;
+    node.showModal();
+    return () => {
+      live.current = false;
+      scan.current?.abort();
+      node.close();
+      previous?.focus();
+    };
+  }, []);
+  const run = async (task) => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await task();
+    } catch (failure) {
+      if (live.current) setError(failure.message ?? String(failure));
+    } finally {
+      if (live.current) setBusy(false);
+    }
+  };
+  const browse = (path) => run(async () => {
+    scan.current?.abort();
+    scan.current = new AbortController();
+    const result = await workspaceActions.listDirectory(path || void 0, scan.current.signal);
+    if (live.current) {
+      setListing(result);
+      setValue(result.path);
+    }
+  });
+  const save = () => run(async () => {
+    if (dialog.kind === "archive") {
+      await workspaceActions.rowAction("archive", "archiveSession", dialog.row.id, { stopActivity: true });
+      if (live.current) close();
+    } else if (dialog.kind === "add") {
+      const workspace = await createWorkspace({ path: value.trim() });
+      if (live.current) {
+        close();
+        startSession(workspace.workspaceId);
+      }
+    } else {
+      if (dialog.kind === "rename") await renameWorkspace(dialog.workspace.workspaceId, value.trim());
+      else await deleteWorkspace(dialog.workspace.workspaceId);
+      if (live.current) close();
+    }
+  });
+  const label = t(dialog.kind === "archive" ? "Stop and archive" : dialog.kind === "add" ? "Add workspace" : dialog.kind === "rename" ? "Rename workspace" : "Remove workspace");
+  return (0, import_react_dom11.createPortal)((0, import_react42.createElement)(
+    "dialog",
+    { ref, className: "bt-ws-dialog", "aria-label": label, onCancel: (event) => {
+      event.preventDefault();
+      if (!busy) close();
+    } },
+    (0, import_react42.createElement)("h3", null, label),
+    dialog.kind === "archive" ? (0, import_react42.createElement)("p", null, t("This conversation still has active work. Stop it and archive the conversation?"), " ", titleOf2(dialog.row)) : dialog.kind === "delete" ? (0, import_react42.createElement)("p", null, t("Remove this workspace from the list? Files and conversations are kept.")) : (0, import_react42.createElement)(
+      "form",
+      { onSubmit: (event) => {
+        event.preventDefault();
+        save();
+      } },
+      (0, import_react42.createElement)("input", { autoFocus: true, "aria-label": t(dialog.kind === "add" ? "Folder path" : "Name"), value, disabled: busy, placeholder: dialog.kind === "add" ? t("Full path of a folder") : "", onChange: (event) => setValue(event.target.value) })
+    ),
+    dialog.kind === "add" ? (0, import_react42.createElement)(
+      "div",
+      { className: "bt-ws-directory" },
+      (0, import_react42.createElement)(
+        "div",
+        { className: "bt-ws-dialog-actions" },
+        (0, import_react42.createElement)("button", { disabled: busy, onClick: () => browse(value) }, t("Browse folders…")),
+        (0, import_react42.createElement)("button", { disabled: busy, onClick: () => run(async () => {
+          const path = await workspaceActions.pickDirectory();
+          if (path && live.current) setValue(path);
+        }) }, t("Choose a folder…"))
+      ),
+      listing ? (0, import_react42.createElement)(
+        "div",
+        { className: "bt-ws-folders" },
+        listing.crumbs?.length > 1 ? (0, import_react42.createElement)("button", { disabled: busy, onClick: () => browse(listing.crumbs.at(-2).path) }, t("Up one level")) : null,
+        (listing.entries ?? []).filter((entry) => !entry.hidden).map((entry) => (0, import_react42.createElement)("button", { key: entry.path, disabled: busy, onClick: () => browse(entry.path) }, (0, import_react42.createElement)(FolderIcon), entry.name)),
+        listing.truncated ? (0, import_react42.createElement)("p", null, t("Some folders are not shown.")) : null
+      ) : null
+    ) : null,
+    error ? (0, import_react42.createElement)("p", { role: "alert" }, error) : null,
+    (0, import_react42.createElement)(
+      "div",
+      { className: "bt-ws-dialog-actions" },
+      (0, import_react42.createElement)("button", { disabled: busy, onClick: close }, t("Cancel")),
+      (0, import_react42.createElement)("button", { disabled: busy || ["add", "rename"].includes(dialog.kind) && !value.trim(), onClick: save }, busy ? t("Loading…") : ["delete", "archive"].includes(dialog.kind) ? label : t("Save"))
+    )
+  ), document.body);
+}
+function SessionRow({ row, current, status, open, menu, drag }) {
+  const name = titleOf2(row);
+  const state = status?.pendingInteraction ? t("Waiting for your answer") : status?.running ? t("Working") : status?.completionUnread ? t("Unread activity") : "";
+  return (0, import_react42.createElement)(
+    "div",
+    {
+      className: "bt-ws-row",
+      "data-session-id": row.id,
+      "data-row-key": `session:${row.id}`,
+      "data-active": row.id === current || void 0,
+      "data-blank": row.blank || void 0,
+      "data-archived": row.archived || void 0,
+      ...drag,
+      onContextMenu: (event) => {
+        event.preventDefault();
+        menu(event.currentTarget, row);
+      }
+    },
+    (0, import_react42.createElement)(
+      "button",
+      { type: "button", className: "bt-ws-session", onClick: () => open(row), "aria-current": row.id === current ? "page" : void 0, title: [name, state].filter(Boolean).join(" · ") },
+      (0, import_react42.createElement)("span", { className: "bt-ws-copy" }, (0, import_react42.createElement)("span", null, row.pinned ? "⌖ " : "", name), row.snippet ? (0, import_react42.createElement)("small", null, row.snippet) : null),
+      state ? (0, import_react42.createElement)("span", { className: "bt-ws-status", title: state, "aria-label": state }, status?.running ? "◌" : "●") : (0, import_react42.createElement)("time", null, relativeShort(row.updatedAt))
+    ),
+    (0, import_react42.createElement)("button", { type: "button", className: "bt-ws-row-menu", "aria-label": t("Session actions for {name}", { name }), onClick: (event) => menu(event.currentTarget, row) }, (0, import_react42.createElement)(DotsIcon))
+  );
+}
+function OrdinaryWorkspaceBrowser(props) {
+  const {
+    wide,
+    expandSidebar,
+    useSessions,
+    useWorkspaces,
+    useSessionStatus,
+    useRoster,
+    useStore,
+    usePanelInfo,
+    useWorkspaceShortcuts,
+    actions,
+    workspaceActions,
+    startSession,
+    open,
+    searchSessions,
+    searchResultLimit,
+    requestSearch,
+    requestAddWorkspace,
+    closeAddWorkspace,
+    notifyArchivedNotOpenable,
+    insertWorkspaceBefore
+  } = props;
+  const raw = useSessions((state) => state);
+  const workspaces = useWorkspaces((state) => state);
+  const roster = useRoster((state) => state);
+  const view = useStore((state) => state);
+  const statuses = useSessionStatus((state) => state);
+  const panel = usePanelInfo((state) => state.activePanelId);
+  const shortcuts = useWorkspaceShortcuts((state) => state);
+  const [query, setQuery] = (0, import_react42.useState)("");
+  const [searching, setSearching] = (0, import_react42.useState)(false);
+  const [remote, setRemote] = (0, import_react42.useState)({ query: "", items: [], hasMore: false });
+  const [menu, setMenu] = (0, import_react42.useState)(null);
+  const closeMenu = (0, import_react42.useCallback)(() => setMenu(null), []);
+  const [dialog, setDialog] = (0, import_react42.useState)(null);
+  const [error, setError] = (0, import_react42.useState)("");
+  const [more, setMore] = (0, import_react42.useState)({});
+  const [delayed, setDelayed] = (0, import_react42.useState)(false);
+  const search = (0, import_react42.useRef)(null);
+  const request = (0, import_react42.useRef)(shortcuts.searchRequest);
+  const dragging = (0, import_react42.useRef)(null);
+  const current = panel === null ? Object.values(raw.byId).find((row) => row.retainedBy?.mainView > 0)?.id : void 0;
+  const list = (0, import_react42.useMemo)(() => ordinaryWorkspaceList(raw, workspaces.items, roster), [raw, workspaces.items, roster]);
+  const rows = (0, import_react42.useMemo)(() => workspaceRows(list, workspaces, view, current), [list, workspaces, view, current]);
+  const wanted = query.trim();
+  const results = searchWorkspaceRows(rows.flat, list.workspaces, wanted, remote.query === wanted ? remote : void 0, searchResultLimit);
+  (0, import_react42.useEffect)(() => {
+    const timer = setTimeout(() => setDelayed(true), 8e3);
+    return () => clearTimeout(timer);
+  }, []);
+  (0, import_react42.useEffect)(() => {
+    if (shortcuts.searchRequest !== request.current) {
+      request.current = shortcuts.searchRequest;
+      expandSidebar();
+      setSearching(true);
+    }
+  }, [shortcuts.searchRequest]);
+  (0, import_react42.useEffect)(() => {
+    if (searching && wide) search.current?.focus();
+  }, [searching, wide]);
+  (0, import_react42.useEffect)(() => {
+    if (shortcuts.addRequested) {
+      expandSidebar();
+      setDialog({ kind: "add" });
+      closeAddWorkspace();
+    }
+  }, [shortcuts.addRequested]);
+  (0, import_react42.useEffect)(() => {
+    if (!wanted) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const page = await searchSessions(wanted, controller.signal);
+        if (!controller.signal.aborted) setRemote({ ...page, query: wanted });
+      } catch (failure) {
+        if (!controller.signal.aborted) setRemote({ query: wanted, items: [], hasMore: false, error: failure.message });
+      }
+    }, 200);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [wanted, searchSessions]);
+  (0, import_react42.useEffect)(() => {
+    const group = rows.groups.find((item2) => item2.rows.some((row) => row.id === current));
+    if (group) {
+      actions.setGroupExpanded(group.key, true);
+      setMore((previous) => ({ ...previous, [group.key]: Math.max(previous[group.key] ?? 5, group.rows.findIndex((row) => row.id === current) + 1) }));
+    }
+  }, [current]);
+  const run = (task) => {
+    setError("");
+    void Promise.resolve().then(task).catch((failure) => setError(failure.message ?? String(failure)));
+  };
+  const openRow = (row) => row.archived ? notifyArchivedNotOpenable() : open(row.id);
+  const sessionMenu = (anchor, row) => setMenu({ anchor, row });
+  const item = (label, task, disabled = false) => (0, import_react42.createElement)("button", { key: label, type: "button", role: "menuitem", disabled, onClick: () => {
+    setMenu(null);
+    run(task);
+  } }, label);
+  const rowAction = (id, method) => workspaceActions.rowAction(id, method, menu.row.id);
+  const initialOrders = Object.fromEntries([...workspaces.items.map((workspace) => [workspace.workspaceId, workspace.sessionIds]), ["", raw.ids.filter((id) => !workspaces.items.some((workspace) => workspace.sessionIds.includes(id)))], ["__flat_session_order__", raw.ids]]);
+  const renderRows = (entries2, key) => entries2.map((row) => (0, import_react42.createElement)(SessionRow, {
+    key: row.id,
+    row,
+    current,
+    status: statuses.get(row.id),
+    open: openRow,
+    menu: sessionMenu,
+    drag: wanted ? {} : {
+      draggable: true,
+      onDragStart: (event) => {
+        dragging.current = { kind: "session", key, id: row.id };
+        event.dataTransfer.setData("text/plain", row.id);
+        event.dataTransfer.effectAllowed = "move";
+      },
+      onDragEnd: () => {
+        dragging.current = null;
+      },
+      onDragOver: (event) => {
+        if (dragging.current?.kind === "session" && dragging.current.key === key) event.preventDefault();
+      },
+      onDrop: (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const from = dragging.current;
+        dragging.current = null;
+        if (from?.kind !== "session" || from.key !== key) return;
+        const all = key === "__flat_session_order__" ? rows.flat : rows.groups.find((group) => group.key === key)?.rows ?? [];
+        if (all.find((candidate) => candidate.id === from.id)?.pinned !== row.pinned) return;
+        const order = reorderVisible(view.sessionOrderByAccount?.[key] ?? initialOrders[key], initialOrders[key], all.map((candidate) => candidate.id), from.id, row.id);
+        actions.setSessionOrder(key, order, initialOrders);
+      }
+    }
+  }));
+  const renderGroup = (group) => {
+    const label = workspaceTitle(group.workspace);
+    const expanded = view.groupExpansion[group.key] !== false;
+    const count = more[group.key] ?? 5;
+    return (0, import_react42.createElement)(
+      "section",
+      { key: group.key, className: "bt-ws-group", "data-workspace-id": group.key },
+      (0, import_react42.createElement)(
+        "div",
+        {
+          className: "bt-ws-folder",
+          "data-row-key": `workspace:${group.key}`,
+          draggable: Boolean(group.workspace),
+          onDragStart: (event) => {
+            dragging.current = { kind: "workspace", id: group.key };
+            event.dataTransfer.setData("text/plain", group.key);
+          },
+          onDragEnd: () => {
+            dragging.current = null;
+          },
+          onDragOver: (event) => {
+            if (group.workspace && dragging.current?.kind === "workspace") event.preventDefault();
+          },
+          onDrop: (event) => {
+            event.preventDefault();
+            const from = dragging.current;
+            dragging.current = null;
+            if (group.workspace && from?.kind === "workspace" && from.id !== group.key) run(() => insertWorkspaceBefore(from.id, group.key));
+          }
+        },
+        (0, import_react42.createElement)(
+          "button",
+          { className: "bt-ws-folder-title", type: "button", "aria-expanded": expanded, title: group.workspace?.path, onClick: () => actions.setGroupExpanded(group.key, !expanded) },
+          (0, import_react42.createElement)(FolderIcon),
+          (0, import_react42.createElement)("span", null, label),
+          (0, import_react42.createElement)("small", { "aria-label": t("{count} conversations", { count: group.rows.length }) }, group.rows.length || "")
+        ),
+        group.workspace ? (0, import_react42.createElement)("button", { className: "bt-ws-row-menu", type: "button", "aria-label": t("Workspace actions for {name}", { name: label }), onClick: (event) => setMenu({ anchor: event.currentTarget, workspace: group.workspace }) }, (0, import_react42.createElement)(DotsIcon)) : null
+      ),
+      expanded ? (0, import_react42.createElement)(
+        "div",
+        null,
+        renderRows(group.rows.slice(0, count), group.key),
+        group.rows.length > count ? (0, import_react42.createElement)("button", { type: "button", className: "bt-ws-more", onClick: () => setMore((previous) => ({ ...previous, [group.key]: count + 20 })) }, t("Show {count} more", { count: group.rows.length - count })) : null,
+        group.rows.length === 0 && !group.children.length ? (0, import_react42.createElement)("p", { className: "bt-ws-note" }, t("No conversations")) : null,
+        group.children.length ? (0, import_react42.createElement)("div", { className: "bt-ws-nested" }, group.children.map(renderGroup)) : null
+      ) : null
+    );
+  };
+  let menuItems;
+  if (menu?.row) {
+    menuItems = menu.row.archived ? [item(t("Unarchive"), () => rowAction("archive", "unarchiveSession"))] : [
+      item(t(menu.row.pinned ? "Unpin" : "Pin"), () => rowAction("pin", menu.row.pinned ? "unpinSession" : "pinSession")),
+      item(t("Rename"), () => props.requestSessionRename(menu.row.id, titleOf2(menu.row))),
+      item(t("Fork conversation"), () => rowAction("fork", "forkSession")),
+      item(t("Archive session"), async () => {
+        try {
+          await rowAction("archive", "archiveSession");
+        } catch (failure) {
+          if (failure.rpcError?.code === "workspace/session-active") setDialog({ kind: "archive", row: menu.row });
+          else throw failure;
+        }
+      })
+    ];
+    menuItems.push(item(t("Copy session ID"), () => rowAction("session-id", "copySessionId")));
+  } else if (menu?.workspace) {
+    menuItems = [
+      item(t("New chat"), () => {
+        actions.setArchivedFilter("default");
+        startSession(menu.workspace.workspaceId);
+      }),
+      item(t("Rename workspace"), () => setDialog({ kind: "rename", workspace: menu.workspace })),
+      item(t("Remove workspace"), () => setDialog({ kind: "delete", workspace: menu.workspace }))
+    ];
+  } else if (menu) {
+    const option = (key, label, selected, action) => (0, import_react42.createElement)("button", { key, role: "menuitemradio", "aria-checked": selected, onClick: () => {
+      action();
+      setMenu(null);
+    } }, (0, import_react42.createElement)("span", null, label), selected ? "✓" : "");
+    menuItems = [
+      ...[["workspace", "Group by workspace"], ["workspace-tree", "Workspace tree"], ["flat", "All conversations"]].map(([key, label]) => option(key, t(label), view.groupBy === key, () => actions.setGroupBy(key))),
+      (0, import_react42.createElement)("hr", { key: "order" }),
+      ...[["updated", "Most recent first"], ["manual", "Manual order"]].map(([key, label]) => option(key, t(label), view.orderBy === key, () => actions.setOrderBy(key, initialOrders))),
+      (0, import_react42.createElement)("hr", { key: "archive" }),
+      ...[["default", "Hide archived"], ["show", "Show archived"], ["only", "Archived only"]].map(([key, label]) => option(key, t(label), (view.archivedFilter ?? "default") === key, () => actions.setArchivedFilter(key)))
+    ];
+  }
+  return (0, import_react42.createElement)(
+    "div",
+    { className: "bt-ws-browser", "data-wide": wide, "aria-label": t("Ordinary conversations") },
+    (0, import_react42.createElement)(
+      "header",
+      null,
+      wide && !searching ? (0, import_react42.createElement)("span", { className: "bt-ws-heading" }, t("Workspaces")) : null,
+      wide && searching ? (0, import_react42.createElement)("input", { ref: search, type: "search", "aria-label": t("Search ordinary conversations"), placeholder: t("Search conversations"), value: query, onChange: (event) => setQuery(event.target.value), onKeyDown: (event) => {
+        if (event.key === "Escape") {
+          setQuery("");
+          setSearching(false);
+        }
+      } }) : null,
+      (0, import_react42.createElement)("button", { type: "button", "aria-label": t(searching ? "Close search" : "Search conversations"), onClick: () => {
+        if (searching) {
+          setQuery("");
+          setSearching(false);
+        } else requestSearch();
+      } }, (0, import_react42.createElement)(searching ? CloseIcon : SearchIcon)),
+      !searching ? (0, import_react42.createElement)("button", { type: "button", "aria-label": t("Workspace view options"), onClick: (event) => {
+        if (!wide) expandSidebar();
+        setMenu({ anchor: event.currentTarget });
+      } }, (0, import_react42.createElement)(GearIcon)) : null,
+      !searching ? (0, import_react42.createElement)("button", { type: "button", "aria-label": t("Add workspace"), onClick: requestAddWorkspace }, (0, import_react42.createElement)(PlusIcon)) : null
+    ),
+    wide ? (0, import_react42.createElement)(
+      "div",
+      { className: "bt-ws-list" },
+      !roster.ready || raw.phase !== "ready" || workspaces.phase !== "ready" ? (0, import_react42.createElement)("div", { className: "bt-ws-note", role: "status" }, t("Loading…"), delayed ? (0, import_react42.createElement)("button", { onClick: () => run(workspaceActions.refresh) }, t("Retry")) : null) : wanted ? (0, import_react42.createElement)(
+        "div",
+        { "data-workspace-search": true },
+        renderRows(results.items, ""),
+        results.items.length === 0 ? (0, import_react42.createElement)("p", { className: "bt-ws-note" }, t(remote.query !== wanted ? "Searching…" : "No matching conversations")) : null,
+        results.hasMore ? (0, import_react42.createElement)("p", { className: "bt-ws-note" }, t("Content search is limited. Refine your query for more results.")) : null,
+        remote.query === wanted && remote.error ? (0, import_react42.createElement)("p", { className: "bt-ws-note", role: "alert" }, t("Content search failed; showing title matches."), " ", remote.error) : null
+      ) : view.groupBy === "flat" ? renderRows(rows.flat.slice(0, more.flat ?? 40), "__flat_session_order__").concat(rows.flat.length > (more.flat ?? 40) ? (0, import_react42.createElement)("button", { key: "more", className: "bt-ws-more", onClick: () => setMore((previous) => ({ ...previous, flat: (previous.flat ?? 40) + 40 })) }, t("Show {count} more", { count: rows.flat.length - (more.flat ?? 40) })) : []) : workspaceHierarchy(rows.groups, view.groupBy === "workspace-tree").map(renderGroup),
+      error ? (0, import_react42.createElement)("p", { className: "bt-ws-note", role: "alert" }, error) : null
+    ) : null,
+    menu ? (0, import_react42.createElement)(Popup, { anchor: menu.anchor, close: closeMenu, label: t("Workspace actions") }, menuItems) : null,
+    dialog ? (0, import_react42.createElement)(WorkspaceDialog, { key: `${dialog.kind}:${dialog.workspace?.workspaceId ?? ""}`, ...props, dialog, close: () => setDialog(null) }) : null
+  );
+}
+var WORKSPACE_BROWSER_CSS = `
+.bt-ws-browser{display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden;color:var(--dsw-alias-label-primary);font-size:14px}
+.bt-ws-browser button,.bt-ws-popup button,.bt-ws-dialog button{font:inherit;color:inherit;border:0;background:transparent;cursor:pointer}
+.bt-ws-browser button:focus-visible,.bt-ws-popup button:focus-visible,.bt-ws-dialog :focus-visible{outline:2px solid var(--dsw-focus-ring-color);outline-offset:-2px}
+.bt-ws-browser header{display:flex;align-items:center;gap:3px;padding:18px 16px 12px;flex-shrink:0;color:var(--dsw-alias-label-tertiary)}
+.bt-ws-browser header>button{display:grid;place-items:center;width:29px;height:30px;border-radius:8px;flex-shrink:0}
+.bt-ws-heading{flex:1}.bt-ws-browser input{min-width:0;width:100%;border:1px solid var(--dsw-alias-border-l4);border-radius:8px;padding:7px;background:transparent;color:inherit;font:inherit}
+.bt-ws-list{flex:1;overflow:auto;min-height:0;padding:0 10px 20px;scrollbar-width:thin}.bt-ws-group{margin:8px 0}.bt-ws-folder{display:flex;align-items:center;min-height:38px}
+.bt-ws-folder-title{display:flex;align-items:center;gap:8px;text-align:left;min-width:0;flex:1;padding:8px 10px}.bt-ws-folder-title>span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bt-ws-folder-title small{font-size:11px;opacity:.5}
+.bt-ws-row{position:relative;border-radius:10px;display:flex;align-items:center;min-height:36px;margin:2px 0}.bt-ws-row[data-active]{background:var(--dsw-alias-interactive-bg-hover)}
+.bt-ws-row:hover,.bt-ws-folder:hover,.bt-ws-browser header>button:hover,.bt-ws-popup button:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.bt-ws-session{display:flex;align-items:center;gap:8px;width:100%;min-width:0;padding:9px 12px 9px 30px;text-align:left}.bt-ws-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}.bt-ws-copy>span,.bt-ws-copy>small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bt-ws-copy>small{opacity:.6;font-size:11px}
+.bt-ws-row time{font-size:11px;opacity:.5;white-space:nowrap}.bt-ws-row[data-archived]{opacity:.6}.bt-ws-status{color:var(--dsw-alias-state-business-primary);font-size:12px}
+.bt-ws-row-menu{width:28px;height:28px;display:grid;place-items:center;flex-shrink:0;border-radius:6px!important}.bt-ws-row>.bt-ws-row-menu{position:absolute;right:6px;opacity:0;background:var(--dsw-alias-button-elevated-fill)}
+.bt-ws-row:hover>.bt-ws-row-menu,.bt-ws-row:focus-within>.bt-ws-row-menu{opacity:1}.bt-ws-row:hover time,.bt-ws-row:focus-within time{visibility:hidden}
+.bt-ws-nested{margin-left:12px;border-left:1px solid var(--dsw-alias-border-l4)}.bt-ws-more{font-size:12px!important;opacity:.6;padding:8px 30px}.bt-ws-note{font-size:12px;opacity:.65;padding:5px 26px;line-height:1.6}.bt-ws-note button{margin-left:8px;text-decoration:underline}
+.bt-ws-browser[data-wide=false] header{flex-direction:column;padding:12px 0}.bt-ws-popup{position:fixed;z-index:600;width:240px;padding:6px;border-radius:12px;border:1px solid var(--dsw-alias-border-l4);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);box-shadow:0 8px 32px rgba(0,0,0,.12);font:13px/1.5 system-ui}
+.bt-ws-popup button{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;padding:8px 12px;width:100%;border-radius:6px}.bt-ws-popup hr{border:0;border-top:1px solid var(--dsw-alias-border-l4);margin:5px}
+.bt-ws-dialog{width:min(460px,calc(100vw - 40px));padding:24px;border:1px solid var(--dsw-alias-border-l4);border-radius:16px;background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);font:14px/1.6 system-ui}.bt-ws-dialog::backdrop{background:rgba(0,0,0,.25)}.bt-ws-dialog h3{margin:0 0 16px}.bt-ws-dialog input{box-sizing:border-box;width:100%;border:1px solid var(--dsw-alias-border-l4);background:transparent;color:inherit;border-radius:8px;padding:9px;font:inherit}.bt-ws-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.bt-ws-dialog button{padding:7px 12px;border-radius:8px;background:var(--dsw-alias-interactive-bg-hover)}.bt-ws-dialog button:disabled{opacity:.4;cursor:wait}.bt-ws-folders{max-height:240px;overflow:auto;display:flex;flex-direction:column;gap:4px;margin-top:12px}.bt-ws-folders button{display:flex;gap:8px;align-items:center;text-align:left}.bt-ws-dialog [role=alert]{color:var(--dsw-alias-state-error-primary)}
+`;
+
 // src/client/index.js
 var inject = ["sessions", "workspaces", "uiWorkspace", "uiConversation", "slots", "theme", "layout"];
 function apply(ctx) {
@@ -16150,6 +16775,11 @@ function apply(ctx) {
   ctx.effect(() => installCompiledStyles(COMPANION_ENTRY_CSS, "companion-entry"), "ds-bot: companion entry styles");
   shadow("main", { key: COMPANION_PANEL, inject: face }, CompanionLanding);
   shadow("sidebar.panellist", { id: COMPANION_PANEL, order: -100, label: COMPANION_NAME }, CompanionIcon);
+  ctx.effect(() => installCompiledStyles(WORKSPACE_BROWSER_CSS, "workspace-browser"), "ds-bot: ordinary workspace styles");
+  ctx.slots.inject("sidebar.workspaces", () => installWorkspaceBrowser(ctx, roster, async () => {
+    await pull();
+    await ctx.sessions.refresh();
+  }));
   ctx.effect(() => {
     let previousBot;
     let followingPart;
